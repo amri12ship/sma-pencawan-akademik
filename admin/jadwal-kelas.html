@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<!-- admin/jadwal-kelas.html — Jadwal per kelas + peringatan bentrok ruangan -->
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jadwal Kelas — SMA Pencawan</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div class="main-area">
+    <main class="page-content">
+      <div class="page-head">
+        <div>
+          <h2>Jadwal Kelas</h2>
+          <p>Jadwal pelajaran per kelas dengan peringatan bentrok ruangan.</p>
+        </div>
+        <div class="toolbar" style="margin:0">
+          <select class="form-select" id="pilih-kelas"></select>
+          <button class="btn btn-primary" id="btn-tambah"><i class="fa-solid fa-plus"></i> Tambah Slot</button>
+        </div>
+      </div>
+
+      <div id="peringatan"></div>
+
+      <div class="card">
+        <div class="card-title-flex" style="margin-bottom:14px">
+          <div class="card-title">Jadwal Pelajaran — Kelas <span id="label-kelas"></span></div>
+          <span class="badge badge-netral" id="jml-siswa"></span>
+        </div>
+        <div class="jadwal-grid-wrap">
+          <table class="jadwal-grid" id="grid"></table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Template modal slot jadwal kelas -->
+  <template id="tpl-slot-kelas">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="k-judul">Tambah Slot Pelajaran</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="k-idx">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Hari</label>
+            <select class="form-select" id="k-hari"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Jam ke-</label>
+            <select class="form-select" id="k-jam"></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Guru</label>
+            <select class="form-select" id="k-guru"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ruang</label>
+            <input class="form-input" id="k-ruang" placeholder="mis. R-201">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mata Pelajaran</label>
+          <input class="form-input" id="k-mapel">
+        </div>
+        <div class="alert alert-merah" id="k-bentrok" style="display:none">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span id="k-bentrok-teks"></span>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-merah" id="k-hapus" style="margin-right:auto;display:none"><i class="fa-solid fa-trash"></i> Hapus</button>
+        <button class="btn btn-outline modal-close">Batal</button>
+        <button class="btn btn-primary" id="k-simpan"><i class="fa-solid fa-floppy-disk"></i> Simpan</button>
+      </div>
+    </div>
+  </template>
+
+  <script src="../js/data.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    initAdmin("jadwal-kelas.html", "Jadwal Kelas");
+
+    let jadwal = JSON.parse(localStorage.getItem("sp_jadwalKelas") || "null") || [...JADWAL_GURU];
+
+    const selKelas = $("#pilih-kelas");
+    selKelas.innerHTML = DAFTAR_KELAS.map(k => `<option>${k}</option>`).join("");
+
+    function simpan() { localStorage.setItem("sp_jadwalKelas", JSON.stringify(jadwal)); render(); }
+
+    /** Render grid jadwal kelas terpilih. */
+    function render() {
+      const kelas = selKelas.value;
+      $("#label-kelas").textContent = kelas;
+      $("#jml-siswa").textContent = `${SISWA[kelas]?.length || 0} siswa`;
+
+      let html = `<thead><tr><th class="jam-col">Jam</th>${HARI.map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>`;
+      JAM_PELAJARAN.forEach(j => {
+        html += `<tr><td class="jam-col">${j.ke} • ${j.mulai}<br><span style="font-weight:400;font-size:11px">${j.selesai}</span></td>`;
+        HARI.forEach(h => {
+          const idx = jadwal.findIndex(s => s.kelas === kelas && s.hari === h && s.jamKe === j.ke);
+          const s = idx >= 0 ? jadwal[idx] : null;
+          const g = s ? cariGuru(s.idGuru) : null;
+          html += `<td>${s
+            ? `<div class="jadwal-slot isi" data-idx="${idx}" title="Klik untuk ubah">
+                 <span class="m">${esc(s.mapel)}</span>
+                 <span class="k">${esc(g?.nama.split(",")[0] || "-")} • ${esc(s.ruang)}</span></div>`
+            : `<div class="jadwal-slot kosong" data-hari="${h}" data-jam="${j.ke}" title="Klik untuk tambah">+</div>`}</td>`;
+        });
+        html += `</tr>`;
+      });
+      $("#grid").innerHTML = html + `</tbody>`;
+    }
+
+    $("#grid").addEventListener("click", e => {
+      const slot = e.target.closest(".jadwal-slot");
+      if (!slot) return;
+      if (slot.classList.contains("isi")) bukaForm(+slot.dataset.idx);
+      else bukaForm(null, slot.dataset.hari, +slot.dataset.jam);
+    });
+
+    $("#btn-tambah").addEventListener("click", () => bukaForm(null, "Senin", 1));
+    selKelas.addEventListener("change", render);
+
+    /** Cek bentrok: kelas terisi / ruangan dipakai / guru mengajar 2 kelas di jam sama. */
+    function cekBentrok(d, abaikanIdx) {
+      const kelasLain = jadwal.find((s, i) => i !== abaikanIdx && s.kelas === d.kelas && s.hari === d.hari && s.jamKe === d.jamKe);
+      if (kelasLain) return `Bentrok! Kelas ini sudah terisi ${kelasLain.mapel}.`;
+      const ruangDipakai = jadwal.find((s, i) => i !== abaikanIdx && s.ruang === d.ruang && s.hari === d.hari && s.jamKe === d.jamKe);
+      if (ruangDipakai && d.ruang) return `Bentrok! Ruang ${d.ruang} dipakai ${ruangDipakai.kelas} (${ruangDipakai.mapel}).`;
+      const guruBentrok = jadwal.find((s, i) => i !== abaikanIdx && s.idGuru === d.idGuru && s.hari === d.hari && s.jamKe === d.jamKe);
+      if (guruBentrok) return `Bentrok! Guru tersebut sudah mengajar ${guruBentrok.kelas} pada jam ini.`;
+      return null;
+    }
+
+    /** Buka modal tambah/ubah slot. */
+    function bukaForm(idx, hariDefault, jamDefault) {
+      const edit = idx != null;
+      const s = edit ? jadwal[idx] : null;
+      Modal.buka("tpl-slot-kelas", box => {
+        $("#k-judul", box).textContent = edit ? "Ubah Slot Pelajaran" : "Tambah Slot Pelajaran";
+        $("#k-hari", box).innerHTML = HARI.map(h => `<option>${h}</option>`).join("");
+        $("#k-jam", box).innerHTML = JAM_PELAJARAN.map(j => `<option value="${j.ke}">${j.ke} • ${j.mulai}–${j.selesai}</option>`).join("");
+        $("#k-guru", box).innerHTML = GURU.filter(g => g.status === "Aktif")
+          .map(g => `<option value="${g.id}">${esc(g.nama)} (${esc(g.mapel)})</option>`).join("");
+
+        $("#k-hari", box).value = s?.hari || hariDefault || "Senin";
+        $("#k-jam", box).value = s?.jamKe || jamDefault || 1;
+        $("#k-guru", box).value = s?.idGuru || GURU[0].id;
+        $("#k-ruang", box).value = s?.ruang || "";
+        $("#k-mapel", box).value = s?.mapel || "";
+        $("#k-idx", box).value = edit ? idx : "";
+        if (edit) $("#k-hapus", box).style.display = "inline-flex";
+
+        // Auto-isi mapel mengikuti guru yang dipilih
+        $("#k-guru", box).addEventListener("change", e => {
+          if (!edit) $("#k-mapel", box).value = cariGuru(e.target.value)?.mapel || "";
+          periksa();
+        });
+
+        function periksa() {
+          const data = {
+            kelas: selKelas.value, hari: $("#k-hari", box).value,
+            jamKe: +$("#k-jam", box).value, ruang: $("#k-ruang", box).value.trim(),
+            idGuru: $("#k-guru", box).value, mapel: $("#k-mapel", box).value.trim(),
+          };
+          const b = cekBentrok(data, edit ? idx : -1);
+          const el = $("#k-bentrok", box);
+          el.style.display = b ? "flex" : "none";
+          if (b) $("#k-bentrok-teks", box).textContent = b;
+          return !b;
+        }
+        ["#k-hari", "#k-jam", "#k-ruang"].forEach(sel => $(sel, box).addEventListener("change", periksa));
+        $("#k-ruang", box).addEventListener("input", periksa);
+        periksa();
+
+        $("#k-simpan", box).addEventListener("click", () => {
+          if (!$("#k-mapel", box).value.trim()) { toast("Mata pelajaran wajib diisi.", "error"); return; }
+          if (!periksa()) { toast("Tidak dapat disimpan: jadwal bentrok.", "error", "Bentrok"); return; }
+          const data = {
+            kelas: selKelas.value, hari: $("#k-hari", box).value,
+            jamKe: +$("#k-jam", box).value, ruang: $("#k-ruang", box).value.trim() || "-",
+            idGuru: $("#k-guru", box).value, mapel: $("#k-mapel", box).value.trim(),
+          };
+          if (edit) jadwal[idx] = { ...jadwal[idx], ...data };
+          else jadwal.push(data);
+          simpan(); Modal.tutup();
+          toast(edit ? "Slot diperbarui." : "Slot ditambahkan.", "success", "Berhasil");
+        });
+
+        $("#k-hapus", box).addEventListener("click", () => {
+          if (confirm("Hapus slot pelajaran ini?")) {
+            jadwal.splice(idx, 1);
+            simpan(); Modal.tutup();
+            toast("Slot dihapus.", "warn");
+          }
+        });
+      });
+    }
+
+    render();
+  </script>
+</body>
+</html>

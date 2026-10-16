@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<!-- admin/absensi-guru.html — Monitoring absensi guru + modal detail & verifikasi -->
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Absensi Guru — SMA Pencawan</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div class="main-area">
+    <main class="page-content">
+      <div class="page-head">
+        <div>
+          <h2>Absensi Guru</h2>
+          <p>Monitoring kehadiran real-time (data dummy). Klik baris untuk detail.</p>
+        </div>
+        <button class="btn btn-outline" id="btn-ekspor"><i class="fa-solid fa-file-export"></i> Ekspor CSV</button>
+      </div>
+
+      <!-- Ringkasan cepat -->
+      <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="stat-card"><div class="stat-icon hijau"><i class="fa-solid fa-user-check"></i></div>
+          <div class="stat-info"><div class="angka" id="r-hadir">0</div><div class="label">Hadir</div></div></div>
+        <div class="stat-card"><div class="stat-icon kuning"><i class="fa-solid fa-clock"></i></div>
+          <div class="stat-info"><div class="angka" id="r-terlambat">0</div><div class="label">Terlambat</div></div></div>
+        <div class="stat-card"><div class="stat-icon biru"><i class="fa-solid fa-envelope"></i></div>
+          <div class="stat-info"><div class="angka" id="r-ijin">0</div><div class="label">Izin / Sakit</div></div></div>
+        <div class="stat-card"><div class="stat-icon merah"><i class="fa-solid fa-triangle-exclamation"></i></div>
+          <div class="stat-info"><div class="angka" id="r-curiga">0</div><div class="label">Mencurigakan</div></div></div>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <input class="form-input" type="date" id="f-tgl" title="Filter tanggal">
+          <input class="form-input grow" id="cari" placeholder="Cari nama guru…">
+          <select class="form-select" id="f-status">
+            <option value="">Semua Status</option>
+            <option>Hadir</option><option>Terlambat</option>
+            <option>Izin</option><option>Sakit</option>
+            <option>Mencurigakan</option><option>Belum Absen</option>
+          </select>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data">
+            <thead>
+              <tr><th>Selfie</th><th>Nama Guru</th><th>Tanggal</th><th>Waktu</th><th>Status</th><th>Jarak</th><th>Koordinat</th><th>Verifikasi</th></tr>
+            </thead>
+            <tbody id="tbody-absen"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="pag"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Template modal detail absensi -->
+  <template id="tpl-detail">
+    <div class="modal modal-lg">
+      <div class="modal-head">
+        <h3>Detail Absensi</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="grid-2" style="gap:14px">
+          <div>
+            <div class="form-label">Foto Selfie</div>
+            <div class="kamera-box" style="min-height:240px">
+              <img id="d-selfie" src="" alt="selfie" style="width:100%;max-height:240px;object-fit:cover">
+            </div>
+          </div>
+          <div>
+            <div class="form-label">Informasi</div>
+            <table class="data" style="font-size:13.5px">
+              <tbody id="d-info"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="form-label" style="margin-top:14px">Lokasi Absensi</div>
+        <div class="map-box sm" id="d-map"></div>
+        <div class="form-group" style="margin-top:14px">
+          <label class="form-label">Catatan Verifikasi</label>
+          <textarea class="form-input" id="d-catatan" rows="2" placeholder="Catatan untuk guru (opsional)"></textarea>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-merah" id="d-tolak"><i class="fa-solid fa-xmark"></i> Tolak</button>
+        <button class="btn btn-hijau" id="d-setujui"><i class="fa-solid fa-check"></i> Setujui</button>
+      </div>
+    </div>
+  </template>
+
+  <script src="../js/data.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    initAdmin("absensi-guru.html", "Absensi Guru");
+
+    // Salinan agar perubahan verifikasi bisa disimpan sesi
+    let data = JSON.parse(localStorage.getItem("sp_absenGuru") || "null") || [...ABSENSI_GURU];
+
+    // Set default tanggal filter = tanggal terbaru
+    const tglTerbaru = data.map(a => a.tgl).sort().reverse()[0];
+    $("#f-tgl").value = tglTerbaru;
+
+    function hitungRingkasan() {
+      const hari = data.filter(a => a.tgl === $("#f-tgl").value);
+      const j = s => hari.filter(a => a.status === s).length;
+      $("#r-hadir").textContent = j("Hadir");
+      $("#r-terlambat").textContent = j("Terlambat");
+      $("#r-ijin").textContent = j("Izin") + j("Sakit");
+      $("#r-curiga").textContent = j("Mencurigakan");
+    }
+
+    const tabel = new TabelDemo({
+      tbody: $("#tbody-absen"),
+      data,
+      searchEl: $("#cari"),
+      filterEl: $("#f-status"),
+      paginationEl: $("#pag"),
+      perPage: 8,
+      render: a => {
+        const g = cariGuru(a.guruId);
+        const jauh = a.jarak != null && a.jarak > SEKOLAH.radius;
+        return `<tr class="clickable" data-id="${a.id}">
+          <td><img class="avatar" src="${g.foto}" alt=""></td>
+          <td style="font-weight:600">${esc(g.nama)}</td>
+          <td>${tglIndo(a.tgl)}</td>
+          <td>${a.jam || "-"}</td>
+          <td>${badgeStatus(a.status)}</td>
+          <td style="${jauh ? "color:#dc2626;font-weight:700" : ""}">${a.jarak != null ? a.jarak + " m" : "-"}</td>
+          <td style="font-size:12px;color:#64748b">${a.lat != null ? a.lat.toFixed(4) + ", " + a.lng.toFixed(4) : "-"}</td>
+          <td>${badgeStatus(a.verifikasi)}</td>
+        </tr>`;
+      },
+    });
+
+    // Filter tanggal memperbarui data + ringkasan
+    $("#f-tgl").addEventListener("change", () => {
+      hitungRingkasan();
+      // Tampilkan hanya tanggal terpilih + search/status tetap berlaku
+      const t = $("#f-tgl").value;
+      tabel.setData(data.filter(a => a.tgl === t || !t));
+    });
+    hitungRingkasan();
+    // Awal: filter sesuai tanggal default
+    tabel.setData(data.filter(a => a.tgl === $("#f-tgl").value));
+
+    // Klik baris → modal detail
+    $("#tbody-absen").addEventListener("click", e => {
+      const tr = e.target.closest("tr[data-id]");
+      if (!tr) return;
+      const a = data.find(x => x.id === +tr.dataset.id);
+      if (a) bukaDetail(a);
+    });
+
+    let petaDetail;
+    function bukaDetail(a) {
+      const g = cariGuru(a.guruId);
+      Modal.buka("tpl-detail", box => {
+        $("#d-selfie", box).src = g.foto;
+        $("#d-info", box).innerHTML = `
+          <tr><td style="color:#64748b">Nama</td><td><b>${esc(g.nama)}</b></td></tr>
+          <tr><td style="color:#64748b">NIP</td><td>${esc(g.nip)}</td></tr>
+          <tr><td style="color:#64748b">Mapel</td><td>${esc(g.mapel)}</td></tr>
+          <tr><td style="color:#64748b">Tanggal</td><td>${tglIndo(a.tgl)}</td></tr>
+          <tr><td style="color:#64748b">Waktu</td><td>${a.jam || "-"}</td></tr>
+          <tr><td style="color:#64748b">Status</td><td>${badgeStatus(a.status)}</td></tr>
+          <tr><td style="color:#64748b">Jarak</td><td>${a.jarak != null ? a.jarak + " m" : "-"} ${a.jarak > SEKOLAH.radius ? '<span class="badge badge-mencurigakan">Di luar radius</span>' : ""}</td></tr>
+          <tr><td style="color:#64748b">Koordinat</td><td>${a.lat != null ? a.lat + ", " + a.lng : "-"}</td></tr>
+          <tr><td style="color:#64748b">Verifikasi</td><td>${badgeStatus(a.verifikasi)}</td></tr>`;
+
+        // Peta lokasi absensi (koordinat bisa null utk izin/sakit)
+        setTimeout(() => {
+          const lat = a.lat ?? SEKOLAH.lat, lng = a.lng ?? SEKOLAH.lng;
+          if (petaDetail) { petaDetail.remove(); petaDetail = null; }
+          const el = $("#d-map", box);
+          if (!el) return;
+          petaDetail = L.map(el).setView([lat, lng], 15);
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OSM" }).addTo(petaDetail);
+          L.circle([SEKOLAH.lat, SEKOLAH.lng], { radius: SEKOLAH.radius, color: "#1e3a8a", fillOpacity: .14 }).addTo(petaDetail);
+          L.circleMarker([lat, lng], { radius: 8, color: "#dc2626", fillOpacity: .8 }).addTo(petaDetail)
+            .bindPopup(a.lat != null ? "Lokasi guru" : "Tidak ada lokasi (izin/sakit)");
+          L.marker([SEKOLAH.lat, SEKOLAH.lng]).addTo(petaDetail).bindPopup("SMA Pencawan");
+          setTimeout(() => petaDetail?.invalidateSize(), 120);
+        }, 150);
+
+        // Aksi verifikasi
+        $("#d-setujui", box).addEventListener("click", () => {
+          a.verifikasi = "Disetujui";
+          simpanPerubahan(); Modal.tutup();
+          toast("Absensi disetujui.", "success", "Verifikasi");
+        });
+        $("#d-tolak", box).addEventListener("click", () => {
+          if (!confirm("Tolak absensi ini?")) return;
+          a.verifikasi = "Ditolak";
+          simpanPerubahan(); Modal.tutup();
+          toast("Absensi ditolak.", "warn", "Verifikasi");
+        });
+      });
+    }
+
+    function simpanPerubahan() {
+      localStorage.setItem("sp_absenGuru", JSON.stringify(data));
+      tabel.setData(data.filter(a => a.tgl === $("#f-tgl").value));
+    }
+
+    // Ekspor = simulasi toast saja
+    $("#btn-ekspor").addEventListener("click", () => {
+      toast("Simulasi ekspor: file CSV akan diunduh pada versi produksi.", "info", "Ekspor");
+    });
+  </script>
+</body>
+</html>

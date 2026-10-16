@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<!-- guru/jadwal.html — Jadwal kelas (VIEW ONLY) dengan penanda jam berlangsung -->
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jadwal — SMA Pencawan</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div class="guru-shell">
+    <main class="guru-content">
+      <!-- Tab harian / mingguan -->
+      <div class="tab-row" id="tab-row">
+        <button class="active" data-tab="harian">Hari Ini</button>
+        <button data-tab="mingguan">Mingguan</button>
+      </div>
+
+      <!-- Tampilan harian -->
+      <div id="tab-harian">
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-title-flex" style="margin-bottom:12px">
+            <div class="card-title">Jadwal Mengajar — <span id="label-hari"></span></div>
+            <span class="badge badge-emas" id="badge-hari"></span>
+          </div>
+          <div id="daftar-harian"></div>
+        </div>
+        <div class="alert alert-biru">
+          <i class="fa-solid fa-circle-info"></i>
+          <span>Kotak berpinggir emas menandai jam pelajaran yang sedang berlangsung. Halaman ini hanya-lihat.</span>
+        </div>
+      </div>
+
+      <!-- Tampilan mingguan -->
+      <div id="tab-mingguan" style="display:none">
+        <div class="card">
+          <div class="card-title-flex" style="margin-bottom:12px">
+            <div class="card-title">Jadwal Mingguan Lengkap</div>
+            <span class="badge badge-netral">Hanya lihat</span>
+          </div>
+          <div class="jadwal-grid-wrap">
+            <table class="jadwal-grid" id="grid"></table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/data.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    const user = initGuru("jadwal.html", "Jadwal Kelas");
+    if (user) {
+      const guru = cariGuru(user.guruId) || GURU[0];
+
+      // ===== Penanda jam berlangsung =====
+      /** Apakah jam pelajaran ke-n sedang berjalan sekarang? */
+      function sedangBerlangsung(jamKe) {
+        const jp = JAM_PELAJARAN.find(j => j.ke === jamKe);
+        if (!jp) return false;
+        const kini = new Date().getHours() * 60 + new Date().getMinutes();
+        const keMenit = t => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+        return kini >= keMenit(jp.mulai) && kini < keMenit(jp.selesai);
+      }
+
+      // ===== Tab switching =====
+      $("#tab-row").addEventListener("click", e => {
+        const b = e.target.closest("button[data-tab]");
+        if (!b) return;
+        $$("#tab-row button").forEach(x => x.classList.remove("active"));
+        b.classList.add("active");
+        $("#tab-harian").style.display = b.dataset.tab === "harian" ? "" : "none";
+        $("#tab-mingguan").style.display = b.dataset.tab === "mingguan" ? "" : "none";
+      });
+
+      // ===== Tampilan harian =====
+      $("#label-hari").textContent = hariIni();
+      $("#badge-hari").textContent = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+
+      const jadwalHari = JADWAL_GURU
+        .filter(j => j.idGuru === guru.id && j.hari === hariIni())
+        .sort((a, b) => a.jamKe - b.jamKe);
+
+      $("#daftar-harian").innerHTML = jadwalHari.length ? jadwalHari.map(j => {
+        const jp = JAM_PELAJARAN.find(x => x.ke === j.jamKe);
+        const now = sedangBerlangsung(j.jamKe);
+        return `<div class="jadwal-hari-item ${now ? "sekarang" : ""}">
+          <div class="jam">${jp.mulai}<br>${jp.selesai}</div>
+          <div class="isi">
+            <div class="m">${esc(j.mapel)} — ${esc(j.kelas)}</div>
+            <div class="k"><i class="fa-solid fa-location-dot"></i> ${esc(j.ruang)} • Jam ke-${j.jamKe}</div>
+          </div>
+          ${now ? '<span class="badge badge-emas">Berlangsung</span>' : ""}
+        </div>`;
+      }).join("") : `<p style="text-align:center;color:#94a3b8;padding:16px 0;margin:0">Tidak ada jadwal mengajar hari ini.</p>`;
+
+      // ===== Grid mingguan (hanya lihat, tanpa aksi edit) =====
+      let html = `<thead><tr><th class="jam-col">Jam</th>${HARI.map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>`;
+      JAM_PELAJARAN.forEach(jp => {
+        html += `<tr><td class="jam-col">${jp.ke} • ${jp.mulai}<br><span style="font-weight:400;font-size:11px">${jp.selesai}</span></td>`;
+        HARI.forEach(h => {
+          const s = JADWAL_GURU.find(x => x.idGuru === guru.id && x.hari === h && x.jamKe === jp.ke);
+          const now = h === hariIni() && sedangBerlangsung(jp.ke);
+          html += `<td>${s
+            ? `<div class="jadwal-slot isi aktif-siswa ${now ? "now" : ""}">
+                 <span class="m">${esc(s.mapel)}</span>
+                 <span class="k">${esc(s.kelas)} • ${esc(s.ruang)}</span></div>`
+            : `<div class="jadwal-slot kosong aktif-siswa">—</div>`}</td>`;
+        });
+        html += `</tr>`;
+      });
+      $("#grid").innerHTML = html + `</tbody>`;
+    }
+  </script>
+</body>
+</html>

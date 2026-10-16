@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<!-- index.html — redirect ke login (atau dashboard sesuai sesi tiruan) -->
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SMA Pencawan — Sistem Akademik</title>
+  <script>
+    // Jika sudah login, langsung ke dashboard sesuai peran
+    (function () {
+      try {
+        var u = JSON.parse(localStorage.getItem("sp_auth"));
+        if (u && u.role === "admin") location.replace("admin/dashboard.html");
+        else if (u && u.role === "guru") location.replace("guru/dashboard.html");
+        else location.replace("login.html");
+      } catch (e) { location.replace("login.html"); }
+    })();
+  </script>
+</head>
+<body>
+  <p style="font-family:sans-serif;text-align:center;margin-top:40vh">Mengalihkan ke halaman login…</p>
+</body>
+</html>

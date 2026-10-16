@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<!-- admin/qr-absensi.html — QR Absensi dinamis + pengaturan lokasi (Leaflet) -->
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Absensi — SMA Pencawan</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div class="main-area">
+    <main class="page-content">
+      <div class="page-head">
+        <div>
+          <h2>QR Absensi</h2>
+          <p>QR code dinamis untuk absensi guru dan siswa.</p>
+        </div>
+        <div class="toolbar" style="margin:0">
+          <label style="display:flex;gap:7px;align-items:center;font-size:13.5px;font-weight:600">
+            <input type="checkbox" id="mode-dinamis" checked> Mode Dinamis (30 detik)
+          </label>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <!-- Kolom QR -->
+        <div class="card">
+          <div class="card-title">QR Code Absensi Hari Ini</div>
+          <div class="qr-display">
+            <div class="qr-frame"><div id="qrc"></div></div>
+            <div class="countdown" id="countdown">Memuat…</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+              <button class="btn btn-primary btn-sm" id="btn-gen"><i class="fa-solid fa-rotate"></i> Generate Ulang</button>
+              <button class="btn btn-outline btn-sm" id="btn-unduh"><i class="fa-solid fa-download"></i> Unduh</button>
+              <button class="btn btn-outline btn-sm" id="btn-cetak"><i class="fa-solid fa-print"></i> Cetak</button>
+            </div>
+            <p style="font-size:12.5px;color:#64748b;text-align:center;margin:4px 0 0">
+              Token berubah otomatis tiap 30 detik agar QR tidak dapat dibagikan.
+            </p>
+          </div>
+        </div>
+
+        <!-- Pengaturan -->
+        <div class="card">
+          <div class="card-title">Pengaturan Absensi</div>
+          <form id="form-set">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Latitude Sekolah</label>
+                <input class="form-input" id="set-lat" type="number" step="any">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Longitude Sekolah</label>
+                <input class="form-input" id="set-lng" type="number" step="any">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Radius (meter)</label>
+                <input class="form-input" id="set-radius" type="number" min="10" value="100">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Toleransi Terlambat (menit)</label>
+                <input class="form-input" id="set-tol" type="number" min="0" value="15">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Jam Masuk</label>
+                <input class="form-input" id="set-masuk" type="time" value="07:00">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Jam Pulang</label>
+                <input class="form-input" id="set-pulang" type="time" value="15:30">
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block" type="submit">
+              <i class="fa-solid fa-floppy-disk"></i> Simpan Pengaturan
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Peta radius -->
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">Peta Lokasi & Radius Sekolah</div>
+        <div class="map-box" id="map"></div>
+        <p style="font-size:12.5px;color:#64748b;margin:10px 0 0">
+          <i class="fa-solid fa-location-dot" style="color:#1e3a8a"></i>
+          <span id="peta-info"></span>
+        </p>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/data.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    initAdmin("qr-absensi.html", "QR Absensi");
+
+    // ===== Isi form pengaturan dari data sekolah =====
+    $("#set-lat").value = SEKOLAH.lat;
+    $("#set-lng").value = SEKOLAH.lng;
+    $("#set-radius").value = SEKOLAH.radius;
+    $("#set-tol").value = SEKOLAH.toleransiMenit;
+    $("#set-masuk").value = SEKOLAH.jamMasuk;
+    $("#set-pulang").value = SEKOLAH.jamPulang;
+
+    // ===== Peta Leaflet + lingkaran radius =====
+    let peta, lingkaran;
+    function renderPeta() {
+      const lat = parseFloat($("#set-lat").value) || SEKOLAH.lat;
+      const lng = parseFloat($("#set-lng").value) || SEKOLAH.lng;
+      const r = parseInt($("#set-radius").value) || SEKOLAH.radius;
+
+      if (!peta) {
+        peta = L.map("map").setView([lat, lng], 15);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "&copy; OpenStreetMap",
+        }).addTo(peta);
+        L.marker([lat, lng]).addTo(peta).bindPopup("<b>SMA Pencawan</b>").openPopup();
+        lingkaran = L.circle([lat, lng], { radius: r, color: "#1e3a8a", fillOpacity: .14, weight: 2 }).addTo(peta);
+      } else {
+        peta.setView([lat, lng], 15);
+        lingkaran.setLatLng([lat, lng]).setRadius(r);
+      }
+      $("#peta-info").textContent = `Lokasi: ${lat.toFixed(5)}, ${lng.toFixed(5)} • Radius ${r} m`;
+    }
+    // Leaflet butuh container terlihat; render setelah halaman siap
+    setTimeout(renderPeta, 120);
+
+    $("#form-set").addEventListener("submit", e => {
+      e.preventDefault();
+      SEKOLAH.lat = parseFloat($("#set-lat").value);
+      SEKOLAH.lng = parseFloat($("#set-lng").value);
+      SEKOLAH.radius = parseInt($("#set-radius").value);
+      SEKOLAH.toleransiMenit = parseInt($("#set-tol").value);
+      SEKOLAH.jamMasuk = $("#set-masuk").value;
+      SEKOLAH.jamPulang = $("#set-pulang").value;
+      renderPeta();
+      generateQR();
+      toast("Pengaturan absensi disimpan.", "success", "Berhasil");
+    });
+
+    // ===== QR Code =====
+    let qr, timerSisa = 30, timerId = null;
+
+    /** Buat token acak untuk QR. */
+    function buatToken() {
+      const tgl = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      const rnd = Math.random().toString(36).slice(2, 8).toUpperCase();
+      return `SP-${tgl}-${rnd}`;
+    }
+
+    function generateQR() {
+      const token = buatToken();
+      const isi = JSON.stringify({ sekolah: SEKOLAH.nama, token, jam: SEKOLAH.jamMasuk });
+      const box = $("#qrc");
+      box.innerHTML = "";
+      qr = new QRCode(box, { text: isi, width: 220, height: 220, colorDark: "#0f172a", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
+      // Simpan token utk unduh/cetak
+      box.dataset.token = token;
+      resetCountdown();
+    }
+
+    // Countdown 30 detik (mode dinamis)
+    function resetCountdown() {
+      clearInterval(timerId);
+      timerSisa = 30;
+      updateCountdown();
+      if ($("#mode-dinamis").checked) {
+        timerId = setInterval(() => {
+          timerSisa--;
+          updateCountdown();
+          if (timerSisa <= 0) generateQR(); // ganti QR otomatis
+        }, 1000);
+      }
+    }
+    function updateCountdown() {
+      const el = $("#countdown");
+      if (!$("#mode-dinamis").checked) {
+        el.textContent = "Mode statis (QR tidak berganti)";
+        el.classList.remove("warn");
+        return;
+      }
+      el.textContent = `QR diperbarui dalam ${timerSisa} detik`;
+      el.classList.toggle("warn", timerSisa <= 5);
+    }
+
+    $("#btn-gen").addEventListener("click", () => { generateQR(); toast("QR baru berhasil dibuat.", "success"); });
+    $("#mode-dinamis").addEventListener("change", resetCountdown);
+
+    // Unduh QR sebagai gambar PNG
+    $("#btn-unduh").addEventListener("click", () => {
+      const img = $("#qrc canvas");
+      if (!img) { toast("QR belum siap.", "error"); return; }
+      const a = document.createElement("a");
+      a.href = img.toDataURL("image/png");
+      a.download = "qr-absensi-sma-pencawan.png";
+      a.click();
+      toast("QR diunduh (simulasi).", "success");
+    });
+
+    // Cetak QR — buka jendela baru berisi gambar QR
+    $("#btn-cetak").addEventListener("click", () => {
+      const canvas = $("#qrc canvas");
+      if (!canvas) { toast("QR belum siap.", "error"); return; }
+      const w = window.open("", "_blank");
+      w.document.write(`<html><head><title>Cetak QR — SMA Pencawan</title>
+        <style>body{font-family:sans-serif;text-align:center;padding:30px}h2{color:#1e3a8a}</style></head>
+        <body><h2>SMA Pencawan</h2><p>QR Absensi — token <b>${esc($("#qrc").dataset.token || "")}</b></p>
+        <img src="${canvas.toDataURL()}" width="260">
+        <p>Cetak: ${new Date().toLocaleString("id-ID")}</p></body></html>`);
+      w.document.close();
+      w.focus();
+      setTimeout(() => w.print(), 350);
+    });
+
+    generateQR();
+  </script>
+</body>
+</html>

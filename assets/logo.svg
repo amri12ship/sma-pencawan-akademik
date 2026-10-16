@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200" role="img" aria-label="Logo SMA Pencawan">
+  <!-- Logo placeholder SMA Pencawan (prototype) -->
+  <rect width="200" height="200" rx="44" fill="#1e3a8a"/>
+  <circle cx="100" cy="100" r="70" fill="none" stroke="#f59e0b" stroke-width="6"/>
+  <path d="M100 44 L150 74 L100 104 L50 74 Z" fill="#f59e0b"/>
+  <path d="M70 88 V120 c0 12 60 12 60 0 V88" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+  <text x="100" y="158" text-anchor="middle" font-family="Inter, sans-serif" font-size="34" font-weight="800" fill="#fff">SP</text>
+</svg>

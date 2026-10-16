@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<!-- admin/laporan.html — Rekap kehadiran guru bulanan (tabel + grafik) -->
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Laporan — SMA Pencawan</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div class="main-area">
+    <main class="page-content">
+      <div class="page-head">
+        <div>
+          <h2>Laporan Kehadiran</h2>
+          <p>Rekap kehadiran guru per bulan (data dummy).</p>
+        </div>
+        <div class="toolbar" style="margin:0">
+          <select class="form-select" id="f-bulan">
+            <option value="2026-10">Oktober 2026</option>
+            <option value="2026-09">September 2026</option>
+          </select>
+          <button class="btn btn-outline" id="btn-ekspor"><i class="fa-solid fa-print"></i> Cetak</button>
+        </div>
+      </div>
+
+      <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="stat-card"><div class="stat-icon hijau"><i class="fa-solid fa-user-check"></i></div>
+          <div class="stat-info"><div class="angka" id="t-hadir">0</div><div class="label">Total Hadir</div></div></div>
+        <div class="stat-card"><div class="stat-icon kuning"><i class="fa-solid fa-clock"></i></div>
+          <div class="stat-info"><div class="angka" id="t-terlambat">0</div><div class="label">Total Terlambat</div></div></div>
+        <div class="stat-card"><div class="stat-icon biru"><i class="fa-solid fa-envelope"></i></div>
+          <div class="stat-info"><div class="angka" id="t-ijin">0</div><div class="label">Izin + Sakit</div></div></div>
+        <div class="stat-card"><div class="stat-icon merah"><i class="fa-solid fa-user-slash"></i></div>
+          <div class="stat-info"><div class="angka" id="t-alpa">0</div><div class="label">Alfa</div></div></div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:16px">
+        <div class="card">
+          <div class="card-title">Grafik Kehadiran per Guru</div>
+          <canvas id="grafik-bar" height="260"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-title">Komposisi Bulan Ini</div>
+          <canvas id="grafik-donat" height="260"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Tabel Rekap</div>
+        <div class="table-wrap">
+          <table class="data">
+            <thead>
+              <tr><th>NIP</th><th>Nama Guru</th><th>Mapel</th><th>Hadir</th><th>Terlambat</th><th>Izin</th><th>Sakit</th><th>Alfa</th><th>% Kehadiran</th></tr>
+            </thead>
+            <tbody id="tbody-rekap"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/data.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    initAdmin("laporan.html", "Laporan");
+
+    let barChart, donatChart;
+
+    function render() {
+      const bulan = $("#f-bulan").value;
+      const rows = LAPORAN_BULANAN[bulan] || [];
+
+      // Ringkasan
+      const sum = k => rows.reduce((a, r) => a + r[k], 0);
+      $("#t-hadir").textContent = sum("hadir");
+      $("#t-terlambat").textContent = sum("terlambat");
+      $("#t-ijin").textContent = sum("izin") + sum("sakit");
+      $("#t-alpa").textContent = sum("alpa");
+
+      // Tabel rekap + persentase
+      $("#tbody-rekap").innerHTML = rows.map(r => {
+        const g = cariGuru(r.guruId);
+        const total = r.hadir + r.terlambat + r.izin + r.sakit + r.alpa;
+        const pct = total ? Math.round((r.hadir + r.terlambat) / total * 100) : 0;
+        const warna = pct >= 90 ? "nilai-baik" : pct < 80 ? "nilai-bawah" : "";
+        return `<tr>
+          <td>${esc(g.nip)}</td>
+          <td style="font-weight:600">${esc(g.nama)}</td>
+          <td>${esc(g.mapel)}</td>
+          <td>${r.hadir}</td><td>${r.terlambat}</td><td>${r.izin}</td><td>${r.sakit}</td>
+          <td>${r.alpa}</td>
+          <td class="${warna}">${pct}%</td>
+        </tr>`;
+      }).join("");
+
+      // Grafik bar per guru
+      barChart?.destroy();
+      barChart = new Chart($("#grafik-bar"), {
+        type: "bar",
+        data: {
+          labels: rows.map(r => cariGuru(r.guruId).nama.split(",")[0]),
+          datasets: [
+            { label: "Hadir", data: rows.map(r => r.hadir), backgroundColor: "#16a34a" },
+            { label: "Terlambat", data: rows.map(r => r.terlambat), backgroundColor: "#eab308" },
+            { label: "Izin/Sakit", data: rows.map(r => r.izin + r.sakit), backgroundColor: "#2563eb" },
+            { label: "Alfa", data: rows.map(r => r.alpa), backgroundColor: "#dc2626" },
+          ],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: "bottom" } },
+          scales: { x: { stacked: true, ticks: { font: { size: 10 } } }, y: { stacked: true, beginAtZero: true } },
+        },
+      });
+
+      // Grafik donat komposisi
+      donatChart?.destroy();
+      donatChart = new Chart($("#grafik-donat"), {
+        type: "doughnut",
+        data: {
+          labels: ["Hadir", "Terlambat", "Izin", "Sakit", "Alfa"],
+          datasets: [{
+            data: [sum("hadir"), sum("terlambat"), sum("izin"), sum("sakit"), sum("alpa")],
+            backgroundColor: ["#16a34a", "#eab308", "#2563eb", "#60a5fa", "#dc2626"],
+          }],
+        },
+        options: { responsive: true, plugins: { legend: { position: "bottom" } }, cutout: "60%" },
+      });
+    }
+
+    $("#f-bulan").addEventListener("change", () => { render(); toast("Laporan diperbarui.", "info"); });
+    $("#btn-ekspor").addEventListener("click", () => toast("Simulasi cetak laporan.", "info", "Cetak"));
+
+    render();
+  </script>
+</body>
+</html>

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<!-- guru/absensi-siswa.html — Absensi siswa: toggle status, ringkasan, rekap per kelas -->
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Absensi Siswa — SMA Pencawan</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div class="guru-shell">
+    <main class="guru-content">
+      <div class="tab-row" id="tab-row">
+        <button class="active" data-tab="isi">Isi Absensi</button>
+        <button data-tab="rekap">Rekap Kelas</button>
+      </div>
+
+      <!-- Tab isi absensi -->
+      <div id="tab-isi">
+        <div class="card" style="margin-bottom:14px">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Pilih Jadwal / Kelas</label>
+            <select class="form-select" id="pilih-jadwal"></select>
+          </div>
+        </div>
+
+        <!-- Ringkasan jumlah kehadiran -->
+        <div class="ringkas-kehadiran" id="ringkas"></div>
+
+        <div class="card">
+          <div class="card-title-flex" style="margin-bottom:12px">
+            <div class="card-title">Daftar Siswa</div>
+            <span class="badge badge-netral" id="jml">0 siswa</span>
+          </div>
+          <div id="daftar-siswa"></div>
+          <button class="btn btn-hijau btn-block" id="btn-simpan" style="margin-top:14px">
+            <i class="fa-solid fa-floppy-disk"></i> Simpan Absensi
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab rekap -->
+      <div id="tab-rekap" style="display:none">
+        <div class="card">
+          <div class="card-title-flex" style="margin-bottom:12px">
+            <div class="card-title">Rekap Kehadiran per Kelas</div>
+            <select class="form-select" id="pilih-rekap" style="width:auto"></select>
+          </div>
+          <div class="table-wrap">
+            <table class="data">
+              <thead><tr><th>Nama Siswa</th><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Alpa</th><th>% Hadir</th></tr></thead>
+              <tbody id="tbody-rekap"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/data.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    const user = initGuru("absensi-siswa.html", "Absensi Siswa");
+    if (user) {
+      const guru = cariGuru(user.guruId) || GURU[0];
+
+      // Jadwal guru ini (unik per kelas+jam) sebagai opsi pengisian absensi
+      const opsiJadwal = JADWAL_GURU.filter(j => j.idGuru === guru.id);
+      const selJadwal = $("#pilih-jadwal");
+      selJadwal.innerHTML = opsiJadwal.map((j, i) =>
+        `<option value="${i}">${j.hari} • Jam ${j.jamKe} • ${j.mapel} • ${j.kelas}</option>`).join("");
+      // Tambahkan semua kelas agar guru bisa pilih kelas lain juga
+      if (!opsiJadwal.length) {
+        selJadwal.innerHTML = DAFTAR_KELAS.map(k => `<option value="${k}">Kelas ${k}</option>`).join("");
+      }
+
+      // Status default "Hadir" untuk tiap siswa di kelas terpilih
+      let statusSiswa = {};
+
+      /** Ambil kelas dari opsi terpilih. */
+      function kelasTerpilih() {
+        const j = opsiJadwal[+selJadwal.value];
+        return j ? j.kelas : selJadwal.value;
+      }
+
+      // ===== Render daftar siswa =====
+      function renderSiswa() {
+        const kelas = kelasTerpilih();
+        const siswa = SISWA[kelas] || [];
+        if (!statusSiswa[kelas]) {
+          statusSiswa[kelas] = {};
+          siswa.forEach((s, i) => statusSiswa[kelas][s] = "Hadir"); // default Hadir
+        }
+        $("#jml").textContent = `${siswa.length} siswa`;
+        $("#daftar-siswa").innerHTML = siswa.map((s, i) => {
+          const st = statusSiswa[kelas][s];
+          return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #e2e8f0">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0">
+              <span style="width:26px;height:26px;background:#eef2ff;color:#1e3a8a;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;flex:none">${i + 1}</span>
+              <span style="font-size:13.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s)}</span>
+            </div>
+            <div class="toggle-group" data-nama="${esc(s)}">
+              ${["Hadir", "Izin", "Sakit", "Alpa"].map(o =>
+                `<button class="${st === o ? "on-" + o.toLowerCase() : ""}" data-status="${o}">${o}</button>`).join("")}
+            </div>
+          </div>`;
+        }).join("");
+        renderRingkasan();
+      }
+
+      /** Ringkasan jumlah tiap status. */
+      function renderRingkasan() {
+        const kelas = kelasTerpilih();
+        const st = statusSiswa[kelas] || {};
+        const c = o => Object.values(st).filter(v => v === o).length;
+        $("#ringkas").innerHTML = `
+          <span class="pill" style="color:#166534"><i class="fa-solid fa-check"></i> Hadir: ${c("Hadir")}</span>
+          <span class="pill" style="color:#1e40af"><i class="fa-solid fa-envelope"></i> Izin: ${c("Izin")}</span>
+          <span class="pill" style="color:#1e40af"><i class="fa-solid fa-notes-medical"></i> Sakit: ${c("Sakit")}</span>
+          <span class="pill" style="color:#991b1b"><i class="fa-solid fa-xmark"></i> Alpa: ${c("Alpa")}</span>`;
+      }
+
+      // Klik toggle status siswa
+      $("#daftar-siswa").addEventListener("click", e => {
+        const b = e.target.closest("button[data-status]");
+        if (!b) return;
+        const grup = b.closest(".toggle-group");
+        const nama = grup.dataset.nama;
+        const kelas = kelasTerpilih();
+        statusSiswa[kelas][nama] = b.dataset.status;
+        // Perbarui tampilan tombol
+        $$("button", grup).forEach(x => x.className = "");
+        b.className = "on-" + b.dataset.status.toLowerCase();
+        renderRingkasan();
+      });
+
+      selJadwal.addEventListener("change", renderSiswa);
+
+      // Simpan (toast sukses)
+      $("#btn-simpan").addEventListener("click", () => {
+        const kelas = kelasTerpilih();
+        localStorage.setItem("sp_absenSiswa_" + kelas, JSON.stringify(statusSiswa[kelas]));
+        toast(`Absensi kelas ${kelas} berhasil disimpan.`, "success", "Tersimpan");
+      });
+
+      // ===== Tab switching =====
+      $("#tab-row").addEventListener("click", e => {
+        const b = e.target.closest("button[data-tab]");
+        if (!b) return;
+        $$("#tab-row button").forEach(x => x.classList.remove("active"));
+        b.classList.add("active");
+        $("#tab-isi").style.display = b.dataset.tab === "isi" ? "" : "none";
+        $("#tab-rekap").style.display = b.dataset.tab === "rekap" ? "" : "none";
+      });
+
+      // ===== Rekap per kelas (data dummy acak stabil) =====
+      const selRekap = $("#pilih-rekap");
+      selRekap.innerHTML = DAFTAR_KELAS.map(k => `<option>${k}</option>`).join("");
+      function renderRekap() {
+        const kelas = selRekap.value;
+        $("#tbody-rekap").innerHTML = (SISWA[kelas] || []).map((s, i) => {
+          // Angka dummy deterministik dari index
+          const hadir = 14 + (i % 3);
+          const izin = i % 2, sakit = i % 4 === 0 ? 1 : 0, alpa = i % 5 === 0 ? 1 : 0;
+          const total = hadir + izin + sakit + alpa;
+          const pct = Math.round(hadir / total * 100);
+          return `<tr><td style="font-weight:600">${esc(s)}</td><td>${hadir}</td><td>${izin}</td><td>${sakit}</td><td>${alpa}</td>
+            <td class="${pct < 80 ? "nilai-bawah" : pct >= 90 ? "nilai-baik" : ""}">${pct}%</td></tr>`;
+        }).join("");
+      }
+      selRekap.addEventListener("change", renderRekap);
+
+      renderSiswa();
+      renderRekap();
+    }
+  </script>
+</body>
+</html>

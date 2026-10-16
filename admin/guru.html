@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<!-- admin/guru.html — Manajemen guru (CRUD sederhana dengan modal) -->
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manajemen Guru — SMA Pencawan</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div class="main-area">
+    <main class="page-content">
+      <div class="page-head">
+        <div>
+          <h2>Manajemen Guru</h2>
+          <p>Tambah, ubah, dan nonaktifkan data guru (dummy).</p>
+        </div>
+        <button class="btn btn-primary" id="btn-tambah"><i class="fa-solid fa-plus"></i> Tambah Guru</button>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <input class="form-input grow" id="cari" placeholder="Cari nama, NIP, atau mapel…">
+          <select class="form-select" id="filter-status">
+            <option value="">Semua Status</option>
+            <option value="Aktif">Aktif</option>
+            <option value="Nonaktif">Nonaktif</option>
+          </select>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data">
+            <thead>
+              <tr><th>Foto</th><th>NIP</th><th>Nama</th><th>Mapel</th><th>Status</th><th style="text-align:right">Aksi</th></tr>
+            </thead>
+            <tbody id="tbody-guru"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="pag"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Template modal form guru -->
+  <template id="tpl-form-guru">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="m-judul">Tambah Guru</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="f-id">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">NIP</label>
+            <input class="form-input" id="f-nip" placeholder="18 digit NIP" maxlength="18">
+            <div class="form-error" id="e-nip">NIP wajib diisi (minimal 10 digit).</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Mata Pelajaran</label>
+            <input class="form-input" id="f-mapel" placeholder="mis. Matematika">
+            <div class="form-error" id="e-mapel">Mata pelajaran wajib diisi.</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nama Lengkap</label>
+          <input class="form-input" id="f-nama" placeholder="Nama, S.Pd.">
+          <div class="form-error" id="e-nama">Nama wajib diisi.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-select" id="f-status">
+            <option value="Aktif">Aktif</option>
+            <option value="Nonaktif">Nonaktif</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-outline modal-close">Batal</button>
+        <button class="btn btn-primary" id="f-simpan"><i class="fa-solid fa-floppy-disk"></i> Simpan</button>
+      </div>
+    </div>
+  </template>
+
+  <script src="../js/data.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    initAdmin("guru.html", "Manajemen Guru");
+
+    // Data guru bisa diubah di memori; opsional disimpan di localStorage
+    let daftar = JSON.parse(localStorage.getItem("sp_guru") || "null") || [...GURU];
+
+    const tabel = new TabelDemo({
+      tbody: $("#tbody-guru"),
+      data: daftar,
+      searchEl: $("#cari"),
+      filterEl: $("#filter-status"),
+      paginationEl: $("#pag"),
+      perPage: 8,
+      render: g => `<tr>
+        <td><img class="avatar" src="${g.foto}" alt=""></td>
+        <td>${esc(g.nip)}</td>
+        <td style="font-weight:600">${esc(g.nama)}</td>
+        <td>${esc(g.mapel)}</td>
+        <td>${badgeStatus(g.status)}</td>
+        <td style="text-align:right;white-space:nowrap">
+          <button class="btn btn-outline btn-sm" data-edit="${g.id}"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn btn-merah btn-sm" data-del="${g.id}"><i class="fa-solid fa-user-slash"></i></button>
+        </td>
+      </tr>`,
+    });
+
+    // Simpan perubahan ke localStorage agar demo terasa hidup
+    function simpan() {
+      localStorage.setItem("sp_guru", JSON.stringify(daftar));
+      tabel.setData(daftar);
+    }
+
+    // Aksi edit (buka modal terisi) — delegasi event
+    $("#tbody-guru").addEventListener("click", e => {
+      const bEdit = e.target.closest("[data-edit]");
+      const bDel = e.target.closest("[data-del]");
+      if (bEdit) bukaForm(daftar.find(g => g.id === bEdit.dataset.edit));
+      if (bDel) {
+        const g = daftar.find(x => x.id === bDel.dataset.del);
+        if (g && confirm(`Nonaktifkan guru "${g.nama}"?`)) {
+          g.status = "Nonaktif";
+          simpan();
+          toast("Guru dinonaktifkan.", "warn", "Berhasil");
+        }
+      }
+    });
+
+    $("#btn-tambah").addEventListener("click", () => bukaForm(null));
+
+    /** Buka modal form tambah/ubah guru. */
+    function bukaForm(g) {
+      Modal.buka("tpl-form-guru", box => {
+        $("#m-judul", box).textContent = g ? "Ubah Guru" : "Tambah Guru";
+        $("#f-id", box).value = g?.id || "";
+        $("#f-nip", box).value = g?.nip || "";
+        $("#f-nama", box).value = g?.nama || "";
+        $("#f-mapel", box).value = g?.mapel || "";
+        $("#f-status", box).value = g?.status || "Aktif";
+
+        $("#f-simpan", box).addEventListener("click", () => {
+          // Validasi sederhana
+          const nip = $("#f-nip", box).value.trim();
+          const nama = $("#f-nama", box).value.trim();
+          const mapel = $("#f-mapel", box).value.trim();
+          const okNip = nip.length >= 10, okNama = !!nama, okMapel = !!mapel;
+          $("#e-nip", box).style.display = okNip ? "none" : "block";
+          $("#e-nama", box).style.display = okNama ? "none" : "block";
+          $("#e-mapel", box).style.display = okMapel ? "none" : "block";
+          if (!okNip || !okNama || !okMapel) return;
+
+          const id = $("#f-id", box).value;
+          if (id) {
+            const x = daftar.find(v => v.id === id);
+            Object.assign(x, { nip, nama, mapel, status: $("#f-status", box).value });
+            toast("Data guru diperbarui.", "success", "Berhasil");
+          } else {
+            daftar.push({
+              id: "G" + (daftar.length + 1).toString().padStart(2, "0") + Date.now().toString().slice(-3),
+              nip, nama, mapel, status: $("#f-status", box).value,
+              foto: `https://i.pravatar.cc/150?u=${encodeURIComponent(nama)}`,
+            });
+            toast("Guru baru ditambahkan.", "success", "Berhasil");
+          }
+          simpan();
+          Modal.tutup();
+        });
+      });
+    }
+  </script>
+</body>
+</html>

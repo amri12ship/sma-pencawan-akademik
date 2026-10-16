@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<!-- guru/dashboard.html — Dashboard guru: status absen, jadwal hari ini, pintasan -->
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Guru — SMA Pencawan</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div class="guru-shell">
+    <main class="guru-content">
+      <!-- Sapaan -->
+      <div class="sapaan">
+        <h3 id="sapaan">Selamat datang</h3>
+        <p id="sub-sapaan"></p>
+      </div>
+
+      <!-- Status absen hari ini -->
+      <div id="status-absen"></div>
+
+      <!-- Pintasan -->
+      <div class="shortcut-grid">
+        <a class="shortcut" href="presensi.html"><i class="fa-solid fa-qrcode"></i>Presensi</a>
+        <a class="shortcut" href="absensi-siswa.html"><i class="fa-solid fa-clipboard-user"></i>Absensi Siswa</a>
+        <a class="shortcut" href="nilai.html"><i class="fa-solid fa-star"></i>Nilai</a>
+      </div>
+
+      <!-- Jadwal mengajar hari ini -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title-flex" style="margin-bottom:12px">
+          <div class="card-title">Jadwal Mengajar Hari Ini</div>
+          <span class="badge badge-emas" id="hari-ini"></span>
+        </div>
+        <div id="jadwal-hariini"></div>
+      </div>
+
+      <!-- Pengumuman singkat -->
+      <div class="card">
+        <div class="card-title">Pengumuman Sekolah</div>
+        <div class="alert alert-biru" style="margin-bottom:9px">
+          <i class="fa-solid fa-bullhorn"></i>
+          <span>Rapat dinas Jumat pukul 14.00 di Aula Guru.</span>
+        </div>
+        <div class="alert alert-kuning" style="margin-bottom:0">
+          <i class="fa-solid fa-bullhorn"></i>
+          <span>Penilaian tengah semester diinput paling lambat 25 Oktober 2026.</span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/data.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    const user = initGuru("dashboard.html", "Beranda");
+    if (user) {
+      // Data guru dari akun demo (G01) — fallback ke guru pertama
+      const guru = cariGuru(user.guruId) || GURU[0];
+
+      // Sapaan sesuai waktu
+      const jam = new Date().getHours();
+      const sapa = jam < 11 ? "Selamat pagi" : jam < 15 ? "Selamat siang" : "Selamat sore";
+      $("#sapaan").textContent = `${sapa}, ${guru.nama.split(",")[0]}!`;
+      $("#sub-sapaan").textContent = `${guru.mapel} • ${new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`;
+
+      // Status absen hari ini (dicek dari penyimpanan presensi demo)
+      const presensi = JSON.parse(localStorage.getItem("sp_presensi") || "null");
+      const sudahAbsen = presensi && presensi.status;
+      $("#status-absen").innerHTML = sudahAbsen
+        ? `<div class="status-absen-box sudah">
+             <div class="ic"><i class="fa-solid fa-check"></i></div>
+             <div><div class="t">Sudah absen masuk</div>
+             <div class="s">Pukul ${esc(presensi.jam)} • ${esc(presensi.status)} • Terverifikasi (simulasi)</div></div>
+           </div>`
+        : `<div class="status-absen-box belum">
+             <div class="ic"><i class="fa-solid fa-clock"></i></div>
+             <div style="flex:1"><div class="t">Belum absen hari ini</div>
+             <div class="s">Jam masuk ${SEKOLAH.jamMasuk} • toleransi ${SEKOLAH.toleransiMenit} menit</div></div>
+             <a href="presensi.html" class="btn btn-emas btn-sm">Absen</a>
+           </div>`;
+
+      // Jadwal hari ini
+      $("#hari-ini").textContent = hariIni();
+      const jadwalHari = JADWAL_GURU
+        .filter(j => j.idGuru === guru.id && j.hari === hariIni())
+        .sort((a, b) => a.jamKe - b.jamKe);
+
+      if (!jadwalHari.length) {
+        $("#jadwal-hariini").innerHTML = `<p style="color:#94a3b8;font-size:13.5px;text-align:center;padding:14px 0;margin:0">
+          Tidak ada jadwal mengajar hari ini. 🎉</p>`;
+      } else {
+        $("#jadwal-hariini").innerHTML = jadwalHari.map(j => {
+          const jp = JAM_PELAJARAN.find(x => x.ke === j.jamKe);
+          return `<a class="jadwal-hari-item" href="jadwal.html">
+            <div class="jam">${jp.mulai}<br>${jp.selesai}</div>
+            <div class="isi">
+              <div class="m">${esc(j.mapel)} — ${esc(j.kelas)}</div>
+              <div class="k"><i class="fa-solid fa-location-dot"></i> ${esc(j.ruang)} • Jam ke-${j.jamKe}</div>
+            </div>
+            <i class="fa-solid fa-chevron-right" style="color:#cbd5e1"></i>
+          </a>`;
+        }).join("");
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<!-- admin/dashboard.html — Dashboard admin: kartu ringkasan, grafik 7 hari, absensi terbaru -->
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Admin — SMA Pencawan</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div class="main-area">
+    <main class="page-content">
+      <div class="page-head">
+        <div>
+          <h2>Dashboard</h2>
+          <p>Ringkasan kehadiran guru — <span id="tgl-hari"></span></p>
+        </div>
+        <a href="qr-absensi.html" class="btn btn-emas"><i class="fa-solid fa-qrcode"></i> QR Absensi</a>
+      </div>
+
+      <!-- Kartu ringkasan -->
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-icon biru"><i class="fa-solid fa-chalkboard-user"></i></div>
+          <div class="stat-info"><div class="angka" id="st-total">0</div><div class="label">Total Guru</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon hijau"><i class="fa-solid fa-user-check"></i></div>
+          <div class="stat-info"><div class="angka" id="st-hadir">0</div><div class="label">Hadir Hari Ini</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon kuning"><i class="fa-solid fa-clock"></i></div>
+          <div class="stat-info"><div class="angka" id="st-terlambat">0</div><div class="label">Terlambat</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon merah"><i class="fa-solid fa-user-slash"></i></div>
+          <div class="stat-info"><div class="angka" id="st-belum">0</div><div class="label">Belum Absen</div></div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:16px">
+        <!-- Grafik kehadiran 7 hari -->
+        <div class="card">
+          <div class="card-title-flex" style="margin-bottom:14px">
+            <div class="card-title">Kehadiran 7 Hari Terakhir</div>
+          </div>
+          <canvas id="grafik" height="230"></canvas>
+        </div>
+
+        <!-- Distribusi status hari ini -->
+        <div class="card">
+          <div class="card-title">Distribusi Status Hari Ini</div>
+          <canvas id="grafik-donat" height="230"></canvas>
+        </div>
+      </div>
+
+      <!-- Absensi terbaru -->
+      <div class="card">
+        <div class="card-title-flex" style="margin-bottom:14px">
+          <div class="card-title">Absensi Terbaru</div>
+          <a href="absensi-guru.html" class="btn btn-outline btn-sm">Lihat Semua <i class="fa-solid fa-arrow-right"></i></a>
+        </div>
+        <div class="table-wrap">
+          <table class="data">
+            <thead>
+              <tr><th>Guru</th><th>Waktu</th><th>Jarak</th><th>Status</th><th>Verifikasi</th></tr>
+            </thead>
+            <tbody id="tbody-terbaru"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/data.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    // Proteksi halaman + render shell
+    initAdmin("dashboard.html", "Dashboard");
+
+    $("#tgl-hari").textContent = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+    // ===== Hitung kartu ringkasan (data hari terbaru di dummy) =====
+    const hariTerbaru = ABSENSI_GURU.map(a => a.tgl).sort().reverse()[0];
+    const absenHari = ABSENSI_GURU.filter(a => a.tgl === hariTerbaru);
+    const jml = s => absenHari.filter(a => a.status === s).length;
+
+    $("#st-total").textContent = GURU.length;
+    $("#st-hadir").textContent = jml("Hadir") + jml("Terlambat") + jml("Mencurigakan");
+    $("#st-terlambat").textContent = jml("Terlambat");
+    $("#st-belum").textContent = jml("Belum Absen");
+
+    // ===== Tabel absensi terbaru =====
+    $("#tbody-terbaru").innerHTML = absenHari.slice(0, 6).map(a => {
+      const g = cariGuru(a.guruId);
+      return `<tr>
+        <td><div style="display:flex;gap:9px;align-items:center">
+          <img class="avatar avatar-sm" src="${g.foto}" alt="">
+          <div><div style="font-weight:600">${esc(g.nama)}</div>
+          <div style="font-size:12px;color:#64748b">${esc(g.mapel)}</div></div>
+        </div></td>
+        <td>${a.jam || "-"}</td>
+        <td>${a.jarak != null ? a.jarak + " m" : "-"}</td>
+        <td>${badgeStatus(a.status)}</td>
+        <td>${badgeStatus(a.verifikasi)}</td>
+      </tr>`;
+    }).join("");
+
+    // ===== Grafik garis kehadiran 7 hari =====
+    new Chart($("#grafik"), {
+      type: "line",
+      data: {
+        labels: KEHADIRAN_7_HARI.map(k => k.hari),
+        datasets: [
+          { label: "Hadir", data: KEHADIRAN_7_HARI.map(k => k.hadir), borderColor: "#16a34a", backgroundColor: "rgba(22,163,74,.12)", fill: true, tension: .35 },
+          { label: "Terlambat", data: KEHADIRAN_7_HARI.map(k => k.terlambat), borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.12)", fill: true, tension: .35 },
+          { label: "Alfa", data: KEHADIRAN_7_HARI.map(k => k.alpa), borderColor: "#dc2626", backgroundColor: "rgba(220,38,38,.10)", fill: true, tension: .35 },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: "bottom" } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 2 } } },
+      },
+    });
+
+    // ===== Grafik donat distribusi hari ini =====
+    new Chart($("#grafik-donat"), {
+      type: "doughnut",
+      data: {
+        labels: ["Hadir", "Terlambat", "Izin", "Sakit", "Mencurigakan", "Belum Absen"],
+        datasets: [{
+          data: [jml("Hadir"), jml("Terlambat"), jml("Izin"), jml("Sakit"), jml("Mencurigakan"), jml("Belum Absen")],
+          backgroundColor: ["#16a34a", "#eab308", "#2563eb", "#60a5fa", "#dc2626", "#cbd5e1"],
+        }],
+      },
+      options: { responsive: true, plugins: { legend: { position: "bottom" } }, cutout: "62%" },
+    });
+  </script>
+</body>
+</html>

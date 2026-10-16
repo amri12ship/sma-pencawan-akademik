@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<!-- guru/profil.html — Profil guru + ubah kata sandi (tampilan saja) -->
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profil — SMA Pencawan</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div class="guru-shell">
+    <main class="guru-content">
+      <!-- Kartu identitas -->
+      <div class="card" style="text-align:center;margin-bottom:14px">
+        <img class="avatar avatar-lg" id="foto" src="" alt="foto" style="margin:0 auto 12px;display:block">
+        <h3 id="nama" style="margin:0 0 3px;color:#1e3a8a"></h3>
+        <p id="mapel" style="margin:0;color:#64748b;font-size:13.5px"></p>
+        <div style="margin-top:10px"><span class="badge badge-aktif">Guru Aktif</span></div>
+      </div>
+
+      <!-- Data diri -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">Data Diri</div>
+        <table class="data" style="border-radius:12px;overflow:hidden">
+          <tbody id="data-diri"></tbody>
+        </table>
+      </div>
+
+      <!-- Ubah kata sandi -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">Ubah Kata Sandi</div>
+        <form id="form-pass">
+          <div class="form-group">
+            <label class="form-label">Kata Sandi Lama</label>
+            <input class="form-input" id="pass-lama" type="password" placeholder="••••••••">
+            <div class="form-error" id="e-pass-lama">Kata sandi lama wajib diisi.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Kata Sandi Baru</label>
+            <input class="form-input" id="pass-baru" type="password" placeholder="min. 6 karakter">
+            <div class="form-error" id="e-pass-baru">Minimal 6 karakter.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Konfirmasi Kata Sandi Baru</label>
+            <input class="form-input" id="pass-konf" type="password" placeholder="ulangi kata sandi baru">
+            <div class="form-error" id="e-pass-konf">Konfirmasi tidak cocok.</div>
+          </div>
+          <button class="btn btn-primary btn-block" type="submit"><i class="fa-solid fa-key"></i> Simpan Kata Sandi</button>
+        </form>
+      </div>
+
+      <!-- Info tambahan -->
+      <div class="card">
+        <div class="card-title">Tentang Aplikasi</div>
+        <p style="font-size:13px;color:#64748b;line-height:1.7;margin:0">
+          Sistem Akademik SMA Pencawan — versi prototipe. Semua data bersifat dummy dan tidak tersimpan di server.
+          Perubahan hanya bertahan di peramban Anda (localStorage).
+        </p>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/data.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    const user = initGuru("profil.html", "Profil");
+    if (user) {
+      const guru = cariGuru(user.guruId) || GURU[0];
+      $("#foto").src = guru.foto;
+      $("#nama").textContent = guru.nama;
+      $("#mapel").textContent = `Guru ${guru.mapel}`;
+      $("#data-diri").innerHTML = `
+        <tr><td style="color:#64748b;width:40%">NIP</td><td><b>${esc(guru.nip)}</b></td></tr>
+        <tr><td style="color:#64748b">Nama Lengkap</td><td>${esc(guru.nama)}</td></tr>
+        <tr><td style="color:#64748b">Mata Pelajaran</td><td>${esc(guru.mapel)}</td></tr>
+        <tr><td style="color:#64748b">Status Kepegawaian</td><td>${badgeStatus(guru.status)}</td></tr>
+        <tr><td style="color:#64748b">Unit</td><td>${esc(SEKOLAH.nama)}</td></tr>
+        <tr><td style="color:#64748b">Alamat Sekolah</td><td>${esc(SEKOLAH.alamat)}</td></tr>`;
+
+      // Validasi form ubah password (tampilan saja, tidak mengubah apa pun)
+      $("#form-pass").addEventListener("submit", e => {
+        e.preventDefault();
+        const lama = $("#pass-lama").value, baru = $("#pass-baru").value, konf = $("#pass-konf").value;
+        let ok = true;
+        $("#e-pass-lama").style.display = lama ? "none" : "block"; if (!lama) ok = false;
+        const okBaru = baru.length >= 6;
+        $("#e-pass-baru").style.display = okBaru ? "none" : "block"; if (!okBaru) ok = false;
+        const okKonf = baru && baru === konf;
+        $("#e-pass-konf").style.display = okKonf ? "none" : "block"; if (!okKonf) ok = false;
+        if (!ok) return;
+        toast("Ini hanya simulasi — kata sandi tidak benar-benar berubah.", "info", "Simulasi");
+        e.target.reset();
+      });
+    }
+  </script>
+</body>
+</html>

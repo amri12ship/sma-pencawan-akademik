@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<!-- admin/jadwal-guru.html — Jadwal mingguan per guru + peringatan bentrok -->
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jadwal Guru — SMA Pencawan</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div class="main-area">
+    <main class="page-content">
+      <div class="page-head">
+        <div>
+          <h2>Jadwal Guru</h2>
+          <p>Grid jadwal mengajar mingguan (Senin–Sabtu × jam pelajaran).</p>
+        </div>
+        <div class="toolbar" style="margin:0">
+          <select class="form-select" id="pilih-guru"></select>
+          <button class="btn btn-primary" id="btn-tambah"><i class="fa-solid fa-plus"></i> Tambah Jadwal</button>
+        </div>
+      </div>
+
+      <div id="peringatan"></div>
+
+      <div class="card">
+        <div class="card-title-flex" style="margin-bottom:14px">
+          <div class="card-title">Jadwal Mengajar — <span id="label-guru"></span></div>
+          <span class="badge badge-netral">Klik slot kosong untuk menambah</span>
+        </div>
+        <div class="jadwal-grid-wrap">
+          <table class="jadwal-grid" id="grid"></table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Template modal slot jadwal -->
+  <template id="tpl-slot">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="s-judul">Tambah Jadwal</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="s-idx">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Hari</label>
+            <select class="form-select" id="s-hari"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Jam ke-</label>
+            <select class="form-select" id="s-jam"></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Kelas</label>
+            <select class="form-select" id="s-kelas"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ruang</label>
+            <input class="form-input" id="s-ruang" placeholder="mis. R-101">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mata Pelajaran</label>
+          <input class="form-input" id="s-mapel">
+        </div>
+        <div class="alert alert-merah" id="s-bentrok" style="display:none">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span id="s-bentrok-teks"></span>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-merah" id="s-hapus" style="margin-right:auto;display:none"><i class="fa-solid fa-trash"></i> Hapus</button>
+        <button class="btn btn-outline modal-close">Batal</button>
+        <button class="btn btn-primary" id="s-simpan"><i class="fa-solid fa-floppy-disk"></i> Simpan</button>
+      </div>
+    </div>
+  </template>
+
+  <script src="../js/data.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    initAdmin("jadwal-guru.html", "Jadwal Guru");
+
+    // Salinan jadwal agar bisa diubah (opsional disimpan)
+    let jadwal = JSON.parse(localStorage.getItem("sp_jadwalGuru") || "null") || [...JADWAL_GURU];
+
+    const selGuru = $("#pilih-guru");
+    selGuru.innerHTML = GURU.filter(g => g.status === "Aktif")
+      .map(g => `<option value="${g.id}">${esc(g.nama)} — ${esc(g.mapel)}</option>`).join("");
+
+    function simpan() { localStorage.setItem("sp_jadwalGuru", JSON.stringify(jadwal)); render(); }
+
+    /** Render grid jadwal guru terpilih. */
+    function render() {
+      const id = selGuru.value;
+      const g = cariGuru(id);
+      $("#label-guru").textContent = g.nama;
+
+      let html = `<thead><tr><th class="jam-col">Jam</th>${HARI.map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>`;
+      JAM_PELAJARAN.forEach(j => {
+        html += `<tr><td class="jam-col">${j.ke} • ${j.mulai}<br><span style="font-weight:400;font-size:11px">${j.selesai}</span></td>`;
+        HARI.forEach(h => {
+          const idx = jadwal.findIndex(s => s.idGuru === id && s.hari === h && s.jamKe === j.ke);
+          const s = idx >= 0 ? jadwal[idx] : null;
+          html += `<td>${s
+            ? `<div class="jadwal-slot isi" data-idx="${idx}" title="Klik untuk ubah">
+                 <span class="m">${esc(s.mapel)}</span>
+                 <span class="k">${esc(s.kelas)} • ${esc(s.ruang)}</span></div>`
+            : `<div class="jadwal-slot kosong" data-hari="${h}" data-jam="${j.ke}" title="Klik untuk tambah">+</div>`}</td>`;
+        });
+        html += `</tr>`;
+      });
+      $("#grid").innerHTML = html + `</tbody>`;
+    }
+
+    // Klik slot: tambah (kosong) atau ubah (isi)
+    $("#grid").addEventListener("click", e => {
+      const slot = e.target.closest(".jadwal-slot");
+      if (!slot) return;
+      if (slot.classList.contains("isi")) bukaForm(+slot.dataset.idx);
+      else bukaForm(null, slot.dataset.hari, +slot.dataset.jam);
+    });
+
+    $("#btn-tambah").addEventListener("click", () => bukaForm(null, "Senin", 1));
+    selGuru.addEventListener("change", render);
+
+    /** Cek bentrok: guru sudah mengajar di jam itu ATAU kelas sudah terisi di jam itu. */
+    function cekBentrok(data, abaikanIdx) {
+      const cGuru = jadwal.find((s, i) => i !== abaikanIdx && s.idGuru === data.idGuru && s.hari === data.hari && s.jamKe === data.jamKe);
+      if (cGuru) return `Bentrok! ${cGuru.kelas} sudah terjadwal pada jam ini.`;
+      const cKelas = jadwal.find((s, i) => i !== abaikanIdx && s.kelas === data.kelas && s.hari === data.hari && s.jamKe === data.jamKe);
+      if (cKelas) return `Bentrok! Kelas ${data.kelas} sudah diajar ${cKelas.mapel} oleh guru lain.`;
+      return null;
+    }
+
+    /** Buka modal tambah/ubah slot jadwal. */
+    function bukaForm(idx, hariDefault, jamDefault) {
+      const edit = idx != null;
+      const s = edit ? jadwal[idx] : null;
+      Modal.buka("tpl-slot", box => {
+        $("#s-judul", box).textContent = edit ? "Ubah Jadwal" : "Tambah Jadwal";
+        $("#s-hari", box).innerHTML = HARI.map(h => `<option>${h}</option>`).join("");
+        $("#s-jam", box).innerHTML = JAM_PELAJARAN.map(j => `<option value="${j.ke}">${j.ke} • ${j.mulai}–${j.selesai}</option>`).join("");
+        $("#s-kelas", box).innerHTML = DAFTAR_KELAS.map(k => `<option>${k}</option>`).join("");
+
+        $("#s-hari", box).value = s?.hari || hariDefault || "Senin";
+        $("#s-jam", box).value = s?.jamKe || jamDefault || 1;
+        $("#s-kelas", box).value = s?.kelas || DAFTAR_KELAS[0];
+        $("#s-ruang", box).value = s?.ruang || "";
+        $("#s-mapel", box).value = s?.mapel || cariGuru(selGuru.value)?.mapel || "";
+        $("#s-idx", box).value = edit ? idx : "";
+
+        if (edit) $("#s-hapus", box).style.display = "inline-flex";
+
+        // Peringatan bentrok realtime saat form diubah
+        function periksa() {
+          const data = {
+            idGuru: selGuru.value, hari: $("#s-hari", box).value,
+            jamKe: +$("#s-jam", box).value, kelas: $("#s-kelas", box).value,
+            ruang: $("#s-ruang", box).value, mapel: $("#s-mapel", box).value,
+          };
+          const b = cekBentrok(data, edit ? idx : -1);
+          const el = $("#s-bentrok", box);
+          el.style.display = b ? "flex" : "none";
+          if (b) $("#s-bentrok-teks", box).textContent = b;
+          return !b;
+        }
+        ["#s-hari", "#s-jam", "#s-kelas"].forEach(sel => $(sel, box).addEventListener("change", periksa));
+        periksa();
+
+        $("#s-simpan", box).addEventListener("click", () => {
+          if (!$("#s-mapel", box).value.trim()) { toast("Mata pelajaran wajib diisi.", "error"); return; }
+          if (!periksa()) { toast("Jadwal bentrok, tidak dapat disimpan.", "error", "Bentrok"); return; }
+          const data = {
+            idGuru: selGuru.value, hari: $("#s-hari", box).value,
+            jamKe: +$("#s-jam", box).value, kelas: $("#s-kelas", box).value,
+            ruang: $("#s-ruang", box).value.trim() || "-", mapel: $("#s-mapel", box).value.trim(),
+          };
+          if (edit) jadwal[idx] = { ...jadwal[idx], ...data };
+          else jadwal.push(data);
+          simpan();
+          Modal.tutup();
+          toast(edit ? "Jadwal diperbarui." : "Jadwal ditambahkan.", "success", "Berhasil");
+        });
+
+        $("#s-hapus", box).addEventListener("click", () => {
+          if (confirm("Hapus slot jadwal ini?")) {
+            jadwal.splice(idx, 1);
+            simpan(); Modal.tutup();
+            toast("Slot jadwal dihapus.", "warn");
+          }
+        });
+      });
+    }
+
+    render();
+  </script>
+</body>
+</html>

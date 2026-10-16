@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<!-- guru/nilai.html — Nilai siswa: CRUD, nilai akhir otomatis, indikator KKM -->
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nilai Siswa — SMA Pencawan</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div class="guru-shell">
+    <main class="guru-content">
+      <div class="card" style="margin-bottom:14px">
+        <div class="form-row" style="margin-bottom:0">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Kelas</label>
+            <select class="form-select" id="pilih-kelas"></select>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Mata Pelajaran</label>
+            <select class="form-select" id="pilih-mapel"></select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title-flex" style="margin-bottom:12px">
+          <div class="card-title">Daftar Nilai</div>
+          <button class="btn btn-primary btn-sm" id="btn-tambah"><i class="fa-solid fa-plus"></i> Tambah</button>
+        </div>
+        <div class="alert alert-biru" style="font-size:12.5px">
+          <i class="fa-solid fa-circle-info"></i>
+          <span>Nilai Akhir = (Tugas 20% + Kuis 15% + UH 15% + UTS 20% + UAS 30%). Nilai di bawah KKM <b id="info-kkm">75</b> ditandai merah.</span>
+        </div>
+        <div class="table-wrap">
+          <table class="data">
+            <thead>
+              <tr><th>Nama Siswa</th><th>Tugas</th><th>Kuis</th><th>UH</th><th>UTS</th><th>UAS</th><th>Nilai Akhir</th><th style="text-align:right">Aksi</th></tr>
+            </thead>
+            <tbody id="tbody-nilai"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Template modal nilai -->
+  <template id="tpl-nilai">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="n-judul">Input Nilai</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="n-idx">
+        <div class="form-group">
+          <label class="form-label">Nama Siswa</label>
+          <select class="form-select" id="n-siswa"></select>
+          <div class="form-error" id="e-siswa">Siswa wajib dipilih.</div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Tugas</label><input class="form-input" id="n-tugas" type="number" min="0" max="100" value="0"><div class="form-error" id="e-tugas">0-100.</div></div>
+          <div class="form-group"><label class="form-label">Kuis</label><input class="form-input" id="n-kuis" type="number" min="0" max="100" value="0"><div class="form-error" id="e-kuis">0-100.</div></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Ulangan Harian (UH)</label><input class="form-input" id="n-uh" type="number" min="0" max="100" value="0"><div class="form-error" id="e-uh">0-100.</div></div>
+          <div class="form-group"><label class="form-label">UTS</label><input class="form-input" id="n-uts" type="number" min="0" max="100" value="0"><div class="form-error" id="e-uts">0-100.</div></div>
+        </div>
+        <div class="form-group"><label class="form-label">UAS</label><input class="form-input" id="n-uas" type="number" min="0" max="100" value="0"><div class="form-error" id="e-uas">0-100.</div></div>
+        <div class="alert alert-hijau" style="margin-bottom:0">
+          <i class="fa-solid fa-calculator"></i>
+          <span>Nilai Akhir: <b id="n-preview">0</b></span>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-merah" id="n-hapus" style="margin-right:auto;display:none"><i class="fa-solid fa-trash"></i> Hapus</button>
+        <button class="btn btn-outline modal-close">Batal</button>
+        <button class="btn btn-primary" id="n-simpan"><i class="fa-solid fa-floppy-disk"></i> Simpan</button>
+      </div>
+    </div>
+  </template>
+
+  <script src="../js/data.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    const user = initGuru("nilai.html", "Nilai Siswa");
+    if (user) {
+      const guru = cariGuru(user.guruId) || GURU[0];
+      $("#pilih-kelas").innerHTML = DAFTAR_KELAS.map(k => `<option>${k}</option>`).join("");
+      const MAPEL = ["Matematika", "B. Indonesia", "B. Inggris", "Biologi", "Kimia", "Fisika", "PPKn", "Sejarah", "Informatika", "Seni Budaya", "Geografi"];
+      $("#pilih-mapel").innerHTML = MAPEL.map(m => `<option>${m === "Matematika" ? guru.mapel : m}</option>`).join("");
+      $("#pilih-kelas").value = "X-1";
+      $("#pilih-mapel").value = guru.mapel === "Matematika" ? "Matematika" : MAPEL[0];
+
+      const KKM = KKM_DEFAULT;
+      $("#info-kkm").textContent = KKM;
+      let nilai = [];
+
+      /** Hitung nilai akhir berbobot. */
+      function nilaiAkhir(r) {
+        return Math.round(r.tugas * .2 + r.kuis * .15 + r.uh * .15 + r.uts * .2 + r.uas * .3);
+      }
+
+      /** Muat data nilai untuk kelas+mapel terpilih (buat dummy bila belum ada). */
+      function muatNilai() {
+        const kelas = $("#pilih-kelas").value, mapel = $("#pilih-mapel").value;
+        const key = `${kelas}|${mapel}`;
+        const tersimpan = localStorage.getItem("sp_nilai_" + key);
+        if (tersimpan) { nilai = JSON.parse(tersimpan); return; }
+        if (NILAI_CONTOH[key]) { nilai = [...NILAI_CONTOH[key]]; return; }
+        // Buat nilai dummy dasar untuk semua siswa kelas ini
+        nilai = (SISWA[kelas] || []).map((s, i) => ({
+          siswa: s, tugas: 70 + (i % 5) * 5, kuis: 72 + (i % 4) * 5, uh: 75 + (i % 3) * 6,
+          uts: 68 + (i % 6) * 5, uas: 70 + (i % 5) * 6,
+        }));
+      }
+
+      function simpanNilai() {
+        localStorage.setItem(`sp_nilai_${$("#pilih-kelas").value}|${$("#pilih-mapel").value}`, JSON.stringify(nilai));
+      }
+
+      /** Render tabel nilai. */
+      function render() {
+        $("#tbody-nilai").innerHTML = nilai.length ? nilai.map((r, i) => {
+          const na = nilaiAkhir(r);
+          const merah = na < KKM;
+          return `<tr>
+            <td style="font-weight:600">${esc(r.siswa)}</td>
+            <td>${r.tugas}</td><td>${r.kuis}</td><td>${r.uh}</td><td>${r.uts}</td><td>${r.uas}</td>
+            <td class="${merah ? "nilai-bawah" : "nilai-baik"}">${na} ${merah ? '<i class="fa-solid fa-triangle-exclamation"></i>' : ""}</td>
+            <td style="text-align:right;white-space:nowrap">
+              <button class="btn btn-outline btn-sm" data-edit="${i}"><i class="fa-solid fa-pen"></i></button>
+              <button class="btn btn-merah btn-sm" data-del="${i}"><i class="fa-solid fa-trash"></i></button>
+            </td>
+          </tr>`;
+        }).join("") : `<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:20px">Belum ada nilai</td></tr>`;
+      }
+
+      $("#pilih-kelas").addEventListener("change", () => { muatNilai(); render(); });
+      $("#pilih-mapel").addEventListener("change", () => { muatNilai(); render(); });
+
+      // Aksi edit / hapus
+      $("#tbody-nilai").addEventListener("click", e => {
+        const bEdit = e.target.closest("[data-edit]");
+        const bDel = e.target.closest("[data-del]");
+        if (bEdit) bukaForm(+bEdit.dataset.edit);
+        if (bDel) {
+          const r = nilai[+bDel.dataset.del];
+          if (r && confirm(`Hapus nilai ${r.siswa}?`)) {
+            nilai.splice(+bDel.dataset.del, 1);
+            simpanNilai(); render();
+            toast("Nilai dihapus.", "warn");
+          }
+        }
+      });
+
+      $("#btn-tambah").addEventListener("click", () => bukaForm(null));
+
+      /** Buka modal input/ubah nilai. */
+      function bukaForm(idx) {
+        const edit = idx != null;
+        const r = edit ? nilai[idx] : null;
+        Modal.buka("tpl-nilai", box => {
+          $("#n-judul", box).textContent = edit ? "Ubah Nilai" : "Input Nilai";
+          // Opsi siswa: bila edit, tetap bisa pilih; default siswa pertama kelas
+          const siswaKelas = SISWA[$("#pilih-kelas").value] || [];
+          $("#n-siswa", box).innerHTML = siswaKelas.map(s => `<option>${esc(s)}</option>`).join("");
+          $("#n-siswa", box).value = r?.siswa || siswaKelas[0] || "";
+          $("#n-tugas", box).value = r?.tugas ?? 75;
+          $("#n-kuis", box).value = r?.kuis ?? 75;
+          $("#n-uh", box).value = r?.uh ?? 75;
+          $("#n-uts", box).value = r?.uts ?? 75;
+          $("#n-uas", box).value = r?.uas ?? 75;
+          $("#n-idx", box).value = edit ? idx : "";
+          if (edit) $("#n-hapus", box).style.display = "inline-flex";
+
+          const ambil = () => ({
+            siswa: $("#n-siswa", box).value,
+            tugas: +$("#n-tugas", box).value, kuis: +$("#n-kuis", box).value,
+            uh: +$("#n-uh", box).value, uts: +$("#n-uts", box).value, uas: +$("#n-uas", box).value,
+          });
+
+          // Preview nilai akhir realtime
+          function preview() { $("#n-preview", box).textContent = nilaiAkhir(ambil()); }
+          ["#n-tugas", "#n-kuis", "#n-uh", "#n-uts", "#n-uas"].forEach(s =>
+            $(s, box).addEventListener("input", preview));
+          preview();
+
+          // Validasi 0-100 per field
+          function valid() {
+            let ok = true;
+            [["tugas", "#n-tugas"], ["kuis", "#n-kuis"], ["uh", "#n-uh"], ["uts", "#n-uts"], ["uas", "#n-uas"]].forEach(([nama, sel]) => {
+              const v = +$(sel, box).value;
+              const salah = isNaN(v) || v < 0 || v > 100;
+              $("#e-" + nama, box).style.display = salah ? "block" : "none";
+              if (salah) ok = false;
+            });
+            if (!$("#n-siswa", box).value) { $("#e-siswa", box).style.display = "block"; ok = false; }
+            return ok;
+          }
+
+          $("#n-simpan", box).addEventListener("click", () => {
+            if (!valid()) { toast("Periksa input: nilai harus 0-100.", "error", "Validasi gagal"); return; }
+            const data = ambil();
+            if (edit) nilai[idx] = data; else nilai.push(data);
+            simpanNilai(); render(); Modal.tutup();
+            toast(edit ? "Nilai diperbarui." : "Nilai ditambahkan.", "success", "Berhasil");
+          });
+
+          $("#n-hapus", box).addEventListener("click", () => {
+            if (confirm("Hapus nilai ini?")) {
+              nilai.splice(idx, 1);
+              simpanNilai(); render(); Modal.tutup();
+              toast("Nilai dihapus.", "warn");
+            }
+          });
+        });
+      }
+
+      muatNilai();
+      render();
+    }
+  </script>
+</body>
+</html>
