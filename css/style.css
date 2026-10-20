@@ -128,8 +128,7 @@ table.data tbody tr.clickable { cursor: pointer; }
    ============================================================ */
 .login-bg {
   min-height: 100vh; display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, rgba(30,58,138,.92) 0%, rgba(37,99,235,.88) 60%, rgba(96,165,250,.82) 100%),
-              url("../assets/GambarSekolah.jfif") center / cover no-repeat;
+  background: url("../assets/GambarSekolah.jfif") center / cover no-repeat fixed;
   padding: 20px;
 }
 .login-card {
