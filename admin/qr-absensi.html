@@ -101,7 +101,7 @@
   <script src="../js/data.js"></script>
   <script src="../js/app.js"></script>
   <script>
-    initAdmin("qr-absensi.html", "QR Absensi");
+    if (initAdmin("qr-absensi.html", "QR Absensi")) {
 
     // ===== Isi form pengaturan dari data sekolah =====
     $("#set-lat").value = SEKOLAH.lat;
@@ -222,6 +222,7 @@
     });
 
     generateQR();
+    }
   </script>
 </body>
 </html>

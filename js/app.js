@@ -24,8 +24,11 @@ function tglIndo(tgl) {
   return `${d.getDate()} ${b[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-/** Tambah/hapus kelas pada elemen. */
-function toggleKelas(el, kelas, aktif) { el.classList.toggle(kelas, aktif); }
+/** Tanggal hari ini "2026-10-20" (lokal, bukan UTC). */
+function tglISO(d = new Date()) {
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
 
 // ============================================================
 // Auth tiruan (localStorage)
@@ -40,7 +43,7 @@ const Auth = {
   /** Proteksi halaman: wajib login & sesuai peran. */
   protect(role) {
     const u = this.get();
-    if (!u) { window.location.href = role === "guru" ? "../login.html" : "../login.html"; return null; }
+    if (!u) { window.location.href = "../login.html"; return null; }
     if (role && u.role !== role) {
       // Guru tidak boleh buka halaman admin dan sebaliknya
       window.location.href = u.role === "admin" ? "../admin/dashboard.html" : "../guru/dashboard.html";
@@ -121,12 +124,11 @@ const MENU_GURU = [
 
 /** Render sidebar admin. dipanggil dari setiap halaman admin. */
 function renderSidebar(halamanAktif) {
-  const user = Auth.get() || {};
   const el = document.createElement("aside");
   el.className = "sidebar";
   el.id = "sidebar";
   el.innerHTML = `
-    <div class="sidebar-brand"><span class="logo-box">SP</span> SMA Pencawan</div>
+    <div class="sidebar-brand"><span class="logo-box"><img src="../assets/logosekolah.jfif" alt="Logo SMA Pencawan"></span> SMA Pencawan</div>
     <nav>
       ${MENU_ADMIN.map(m => `<a href="${m.href}" class="${m.href === halamanAktif ? "active" : ""}">
         <i class="fa-solid ${m.icon}"></i> ${m.label}</a>`).join("")}
@@ -181,12 +183,22 @@ function renderTopbar(judul) {
   });
 }
 
+/** Render footer logo sekolah (aset gambar). */
+function renderFooter(sumber, kelasExtra = "") {
+  const f = document.createElement("footer");
+  f.className = "page-footer " + kelasExtra;
+  f.innerHTML = `<img src="${sumber}" alt="SMA Pencawan">`;
+  return f;
+}
+
 /** Render shell halaman admin (sidebar + topbar). */
 function initAdmin(halaman, judul) {
   const u = Auth.protect("admin");
   if (!u) return null;
   renderSidebar(halaman);
   renderTopbar(judul);
+  (document.querySelector(".main-area") || document.body)
+    .appendChild(renderFooter("../assets/footer_pendidikan.png"));
   return u;
 }
 
@@ -206,9 +218,12 @@ function renderTopbarGuru(judul) {
   const bar = document.createElement("header");
   bar.className = "guru-topbar";
   bar.innerHTML = `
-    <div>
-      <p class="judul">${esc(judul)}</p>
-      <div class="sub">SMA Pencawan • ${esc(user.nama || "Guru")}</div>
+    <div style="display:flex;align-items:center;gap:10px;min-width:0">
+      <img class="tb-logo" src="../assets/logosekolah.jfif" alt="Logo SMA Pencawan">
+      <div>
+        <p class="judul">${esc(judul)}</p>
+        <div class="sub">SMA Pencawan • ${esc(user.nama || "Guru")}</div>
+      </div>
     </div>
     <button class="btn btn-emas btn-sm" id="btn-logout"><i class="fa-solid fa-right-from-bracket"></i></button>`;
   // Sisipkan di dalam .guru-shell agar sejajar dengan konten (max-width 640px)
@@ -224,6 +239,8 @@ function initGuru(halaman, judul) {
   if (!u) return null;
   renderTopbarGuru(judul);
   renderBottomNav(halaman);
+  (document.querySelector(".guru-content") || document.body)
+    .appendChild(renderFooter("../assets/footer_ramah.png", "guru-footer"));
   return u;
 }
 
@@ -285,8 +302,26 @@ class TabelDemo {
 // ============================================================
 // Helper bersama
 // ============================================================
+/** Daftar guru: gabungan data dummy + perubahan admin (localStorage). */
+function daftarGuru() {
+  try {
+    const s = JSON.parse(localStorage.getItem("sp_guru") || "null");
+    if (Array.isArray(s) && s.length) return s;
+  } catch {}
+  return GURU;
+}
+
 /** Cari objek guru berdasar id. */
-function cariGuru(id) { return GURU.find(g => g.id === id); }
+function cariGuru(id) { return daftarGuru().find(g => g.id === id); }
+
+/** Data jadwal: gabungan data dummy + perubahan admin (localStorage). */
+function dataJadwal() {
+  try {
+    const s = JSON.parse(localStorage.getItem("sp_jadwal") || "null");
+    if (Array.isArray(s) && s.length) return s;
+  } catch {}
+  return JADWAL_GURU;
+}
 
 /** Badge status absensi -> HTML. */
 function badgeStatus(s) {
@@ -304,11 +339,8 @@ function jamSekarang() {
   return new Date().toTimeString().slice(0, 5);
 }
 
-/** Hari ini (Senin..Sabtu; Minggu dianggap Sabtu untuk demo). */
+/** Hari ini (Senin..Sabtu; Minggu dianggap Senin untuk demo). */
 function hariIni() {
   const d = new Date().getDay(); // 0 Min .. 6 Sab
   return HARI[Math.min(Math.max(d - 1, 0), 5)];
 }
-
-/** Generate id unik sederhana. */
-function uid() { return Date.now() + Math.floor(Math.random() * 1000); }

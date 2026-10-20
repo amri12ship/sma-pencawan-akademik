@@ -79,7 +79,7 @@
       $("#label-hari").textContent = hariIni();
       $("#badge-hari").textContent = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 
-      const jadwalHari = JADWAL_GURU
+      const jadwalHari = dataJadwal()
         .filter(j => j.idGuru === guru.id && j.hari === hariIni())
         .sort((a, b) => a.jamKe - b.jamKe);
 
@@ -101,7 +101,7 @@
       JAM_PELAJARAN.forEach(jp => {
         html += `<tr><td class="jam-col">${jp.ke} • ${jp.mulai}<br><span style="font-weight:400;font-size:11px">${jp.selesai}</span></td>`;
         HARI.forEach(h => {
-          const s = JADWAL_GURU.find(x => x.idGuru === guru.id && x.hari === h && x.jamKe === jp.ke);
+          const s = dataJadwal().find(x => x.idGuru === guru.id && x.hari === h && x.jamKe === jp.ke);
           const now = h === hariIni() && sedangBerlangsung(jp.ke);
           html += `<td>${s
             ? `<div class="jadwal-slot isi aktif-siswa ${now ? "now" : ""}">

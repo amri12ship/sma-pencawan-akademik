@@ -86,14 +86,14 @@
   <script src="../js/data.js"></script>
   <script src="../js/app.js"></script>
   <script>
-    initAdmin("jadwal-kelas.html", "Jadwal Kelas");
+    if (initAdmin("jadwal-kelas.html", "Jadwal Kelas")) {
 
-    let jadwal = JSON.parse(localStorage.getItem("sp_jadwalKelas") || "null") || [...JADWAL_GURU];
+    let jadwal = [...dataJadwal()];
 
     const selKelas = $("#pilih-kelas");
     selKelas.innerHTML = DAFTAR_KELAS.map(k => `<option>${k}</option>`).join("");
 
-    function simpan() { localStorage.setItem("sp_jadwalKelas", JSON.stringify(jadwal)); render(); }
+    function simpan() { localStorage.setItem("sp_jadwal", JSON.stringify(jadwal)); render(); }
 
     /** Render grid jadwal kelas terpilih. */
     function render() {
@@ -148,7 +148,7 @@
         $("#k-judul", box).textContent = edit ? "Ubah Slot Pelajaran" : "Tambah Slot Pelajaran";
         $("#k-hari", box).innerHTML = HARI.map(h => `<option>${h}</option>`).join("");
         $("#k-jam", box).innerHTML = JAM_PELAJARAN.map(j => `<option value="${j.ke}">${j.ke} • ${j.mulai}–${j.selesai}</option>`).join("");
-        $("#k-guru", box).innerHTML = GURU.filter(g => g.status === "Aktif")
+        $("#k-guru", box).innerHTML = daftarGuru().filter(g => g.status === "Aktif")
           .map(g => `<option value="${g.id}">${esc(g.nama)} (${esc(g.mapel)})</option>`).join("");
 
         $("#k-hari", box).value = s?.hari || hariDefault || "Senin";
@@ -156,7 +156,6 @@
         $("#k-guru", box).value = s?.idGuru || GURU[0].id;
         $("#k-ruang", box).value = s?.ruang || "";
         $("#k-mapel", box).value = s?.mapel || "";
-        $("#k-idx", box).value = edit ? idx : "";
         if (edit) $("#k-hapus", box).style.display = "inline-flex";
 
         // Auto-isi mapel mengikuti guru yang dipilih
@@ -206,6 +205,7 @@
     }
 
     render();
+    }
   </script>
 </body>
 </html>

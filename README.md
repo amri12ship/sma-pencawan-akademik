@@ -58,7 +58,7 @@ sma-pencawan/
 ├── css/style.css         # seluruh gaya (desain sistem)
 ├── js/data.js            # SEMUA dummy data
 ├── js/app.js             # fungsi umum: auth, sidebar, topbar, modal, toast, tabel
-├── assets/               # folder aset (logo/foto placeholder)
+├── assets/               # logo sekolah, gambar latar login, footer (logosekolah.jfif, GambarSekolah.jfif, footer_pendidikan.png, footer_ramah.png)
 └── README.md
 ```
 
@@ -80,6 +80,9 @@ sma-pencawan/
 ## Desain
 
 - Warna utama biru tua `#1e3a8a`, aksen kuning/emas `#f59e0b`, latar abu muda, font Inter.
+- Logo sekolah (`assets/logosekolah.jfif`) tampil di kartu login, sidebar admin, dan topbar guru;
+  halaman login memakai `assets/GambarSekolah.jfif` sebagai latar bergradasi;
+  footer logo (`footer_pendidikan.png` / `footer_ramah.png`) muncul di bagian bawah setiap halaman admin & guru.
 - Sidebar tetap di admin (collapsible di layar kecil), bottom navigation di halaman guru.
 - Kartu bersudut membulat dengan bayangan halus; badge status berwarna
   (Hadir=hijau, Terlambat=kuning, Izin/Sakit=biru, Alpa/Ditolak=merah).

@@ -23,7 +23,7 @@
       </div>
 
       <!-- Ringkasan cepat -->
-      <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat-grid">
         <div class="stat-card"><div class="stat-icon hijau"><i class="fa-solid fa-user-check"></i></div>
           <div class="stat-info"><div class="angka" id="r-hadir">0</div><div class="label">Hadir</div></div></div>
         <div class="stat-card"><div class="stat-icon kuning"><i class="fa-solid fa-clock"></i></div>
@@ -98,7 +98,7 @@
   <script src="../js/data.js"></script>
   <script src="../js/app.js"></script>
   <script>
-    initAdmin("absensi-guru.html", "Absensi Guru");
+    if (initAdmin("absensi-guru.html", "Absensi Guru")) {
 
     // Salinan agar perubahan verifikasi bisa disimpan sesi
     let data = JSON.parse(localStorage.getItem("sp_absenGuru") || "null") || [...ABSENSI_GURU];
@@ -108,7 +108,8 @@
     $("#f-tgl").value = tglTerbaru;
 
     function hitungRingkasan() {
-      const hari = data.filter(a => a.tgl === $("#f-tgl").value);
+      const t = $("#f-tgl").value;
+      const hari = data.filter(a => !t || a.tgl === t);
       const j = s => hari.filter(a => a.status === s).length;
       $("#r-hadir").textContent = j("Hadir");
       $("#r-terlambat").textContent = j("Terlambat");
@@ -206,13 +207,14 @@
 
     function simpanPerubahan() {
       localStorage.setItem("sp_absenGuru", JSON.stringify(data));
-      tabel.setData(data.filter(a => a.tgl === $("#f-tgl").value));
+      tabel.setData(data.filter(a => a.tgl === $("#f-tgl").value || !$("#f-tgl").value));
     }
 
     // Ekspor = simulasi toast saja
     $("#btn-ekspor").addEventListener("click", () => {
       toast("Simulasi ekspor: file CSV akan diunduh pada versi produksi.", "info", "Ekspor");
     });
+    }
   </script>
 </body>
 </html>

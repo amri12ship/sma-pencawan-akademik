@@ -87,7 +87,7 @@
   <script src="../js/data.js"></script>
   <script src="../js/app.js"></script>
   <script>
-    initAdmin("guru.html", "Manajemen Guru");
+    if (initAdmin("guru.html", "Manajemen Guru")) {
 
     // Data guru bisa diubah di memori; opsional disimpan di localStorage
     let daftar = JSON.parse(localStorage.getItem("sp_guru") || "null") || [...GURU];
@@ -173,6 +173,7 @@
           Modal.tutup();
         });
       });
+    }
     }
   </script>
 </body>

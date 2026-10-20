@@ -89,10 +89,10 @@
     if (user) {
       const guru = cariGuru(user.guruId) || GURU[0];
       $("#pilih-kelas").innerHTML = DAFTAR_KELAS.map(k => `<option>${k}</option>`).join("");
-      const MAPEL = ["Matematika", "B. Indonesia", "B. Inggris", "Biologi", "Kimia", "Fisika", "PPKn", "Sejarah", "Informatika", "Seni Budaya", "Geografi"];
-      $("#pilih-mapel").innerHTML = MAPEL.map(m => `<option>${m === "Matematika" ? guru.mapel : m}</option>`).join("");
+      const MAPEL = ["Matematika", "Bahasa Indonesia", "Bahasa Inggris", "Biologi", "Kimia", "Fisika", "PPKn", "Sejarah", "Informatika", "Seni Budaya", "Geografi", "PJOK"];
+      $("#pilih-mapel").innerHTML = MAPEL.map(m => `<option>${m}</option>`).join("");
       $("#pilih-kelas").value = "X-1";
-      $("#pilih-mapel").value = guru.mapel === "Matematika" ? "Matematika" : MAPEL[0];
+      $("#pilih-mapel").value = MAPEL.includes(guru.mapel) ? guru.mapel : MAPEL[0];
 
       const KKM = KKM_DEFAULT;
       $("#info-kkm").textContent = KKM;
@@ -109,7 +109,13 @@
         const key = `${kelas}|${mapel}`;
         const tersimpan = localStorage.getItem("sp_nilai_" + key);
         if (tersimpan) { nilai = JSON.parse(tersimpan); return; }
-        if (NILAI_CONTOH[key]) { nilai = [...NILAI_CONTOH[key]]; return; }
+        if (NILAI_CONTOH[key]) {
+          // Lengkapi contoh nilai dengan seluruh siswa kelas agar tidak ada yang hilang
+          nilai = (SISWA[kelas] || []).map(s =>
+            NILAI_CONTOH[key].find(r => r.siswa === s) ||
+            { siswa: s, tugas: 75, kuis: 75, uh: 75, uts: 75, uas: 75 });
+          return;
+        }
         // Buat nilai dummy dasar untuk semua siswa kelas ini
         nilai = (SISWA[kelas] || []).map((s, i) => ({
           siswa: s, tugas: 70 + (i % 5) * 5, kuis: 72 + (i % 4) * 5, uh: 75 + (i % 3) * 6,
@@ -173,7 +179,6 @@
           $("#n-uh", box).value = r?.uh ?? 75;
           $("#n-uts", box).value = r?.uts ?? 75;
           $("#n-uas", box).value = r?.uas ?? 75;
-          $("#n-idx", box).value = edit ? idx : "";
           if (edit) $("#n-hapus", box).style.display = "inline-flex";
 
           const ambil = () => ({

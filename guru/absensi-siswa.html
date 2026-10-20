@@ -67,7 +67,7 @@
       const guru = cariGuru(user.guruId) || GURU[0];
 
       // Jadwal guru ini (unik per kelas+jam) sebagai opsi pengisian absensi
-      const opsiJadwal = JADWAL_GURU.filter(j => j.idGuru === guru.id);
+      const opsiJadwal = dataJadwal().filter(j => j.idGuru === guru.id);
       const selJadwal = $("#pilih-jadwal");
       selJadwal.innerHTML = opsiJadwal.map((j, i) =>
         `<option value="${i}">${j.hari} • Jam ${j.jamKe} • ${j.mapel} • ${j.kelas}</option>`).join("");
@@ -90,8 +90,10 @@
         const kelas = kelasTerpilih();
         const siswa = SISWA[kelas] || [];
         if (!statusSiswa[kelas]) {
-          statusSiswa[kelas] = {};
-          siswa.forEach((s, i) => statusSiswa[kelas][s] = "Hadir"); // default Hadir
+          // Muat hasil simpan sebelumnya bila ada, selain itu default "Hadir"
+          const simpanan = JSON.parse(localStorage.getItem("sp_absenSiswa_" + kelas) || "null");
+          statusSiswa[kelas] = simpanan && typeof simpanan === "object" ? { ...simpanan } : {};
+          siswa.forEach(s => { if (!statusSiswa[kelas][s]) statusSiswa[kelas][s] = "Hadir"; });
         }
         $("#jml").textContent = `${siswa.length} siswa`;
         $("#daftar-siswa").innerHTML = siswa.map((s, i) => {

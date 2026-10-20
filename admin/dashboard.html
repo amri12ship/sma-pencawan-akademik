@@ -79,22 +79,24 @@
   <script src="../js/app.js"></script>
   <script>
     // Proteksi halaman + render shell
-    initAdmin("dashboard.html", "Dashboard");
-
-    $("#tgl-hari").textContent = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    const admin = initAdmin("dashboard.html", "Dashboard");
+    if (admin) {
 
     // ===== Hitung kartu ringkasan (data hari terbaru di dummy) =====
     const hariTerbaru = ABSENSI_GURU.map(a => a.tgl).sort().reverse()[0];
+    $("#tgl-hari").textContent = hariTerbaru === tglISO()
+      ? new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+      : tglIndo(hariTerbaru) + " (data demo)";
     const absenHari = ABSENSI_GURU.filter(a => a.tgl === hariTerbaru);
     const jml = s => absenHari.filter(a => a.status === s).length;
 
-    $("#st-total").textContent = GURU.length;
-    $("#st-hadir").textContent = jml("Hadir") + jml("Terlambat") + jml("Mencurigakan");
+    $("#st-total").textContent = daftarGuru().length;
+    $("#st-hadir").textContent = jml("Hadir") + jml("Terlambat");
     $("#st-terlambat").textContent = jml("Terlambat");
     $("#st-belum").textContent = jml("Belum Absen");
 
-    // ===== Tabel absensi terbaru =====
-    $("#tbody-terbaru").innerHTML = absenHari.slice(0, 6).map(a => {
+    // ===== Tabel absensi terbaru (6 entri terakhir, terbaru di atas) =====
+    $("#tbody-terbaru").innerHTML = absenHari.slice(-6).reverse().map(a => {
       const g = cariGuru(a.guruId);
       return `<tr>
         <td><div style="display:flex;gap:9px;align-items:center">
@@ -131,7 +133,7 @@
     new Chart($("#grafik-donat"), {
       type: "doughnut",
       data: {
-        labels: ["Hadir", "Terlambat", "Izin", "Sakit", "Mencurigakan", "Belum Absen"],
+        labels: ["Hadir Tepat Waktu", "Terlambat", "Izin", "Sakit", "Mencurigakan", "Belum Absen"],
         datasets: [{
           data: [jml("Hadir"), jml("Terlambat"), jml("Izin"), jml("Sakit"), jml("Mencurigakan"), jml("Belum Absen")],
           backgroundColor: ["#16a34a", "#eab308", "#2563eb", "#60a5fa", "#dc2626", "#cbd5e1"],
@@ -139,6 +141,7 @@
       },
       options: { responsive: true, plugins: { legend: { position: "bottom" } }, cutout: "62%" },
     });
+    }
   </script>
 </body>
 </html>

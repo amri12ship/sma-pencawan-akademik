@@ -259,7 +259,7 @@
           <b>Verifikasi:</b> ${badgeStatus("Menunggu")}<br>
           <b>Tanggal:</b> ${new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`;
         // Simpan ke localStorage agar dashboard mencerminkan status
-        localStorage.setItem("sp_presensi", JSON.stringify({ jam: hasil.jam, status: hasil.status, tgl: new Date().toISOString().slice(0, 10) }));
+        localStorage.setItem("sp_presensi", JSON.stringify({ jam: hasil.jam, status: hasil.status, tgl: tglISO() }));
         setLangkah("sukses");
         toast("Absensi berhasil dikirim.", "success", "Hore!");
       });
@@ -267,9 +267,14 @@
       // Reset untuk demo
       $("#btn-reset").addEventListener("click", () => location.reload());
 
-      // ===== Riwayat absensi pribadi dari data dummy guru ini =====
+      // ===== Riwayat absensi pribadi: data dummy guru ini + presensi sesi berjalan =====
       const riwayat = ABSENSI_GURU.filter(a => a.guruId === guru.id);
-      $("#tbody-riwayat").innerHTML = riwayat.length ? riwayat.map(a => `
+      const sesi = JSON.parse(localStorage.getItem("sp_presensi") || "null");
+      const semuaRiwayat = sesi && sesi.status
+        ? [{ tgl: sesi.tgl, jam: sesi.jam, status: sesi.status, verifikasi: "Menunggu" }, ...riwayat]
+            .sort((a, b) => (b.tgl || "").localeCompare(a.tgl || ""))
+        : riwayat;
+      $("#tbody-riwayat").innerHTML = semuaRiwayat.length ? semuaRiwayat.map(a => `
         <tr><td>${tglIndo(a.tgl)}</td><td>${a.jam || "-"}</td>
         <td>${badgeStatus(a.status)}</td><td>${badgeStatus(a.verifikasi)}</td></tr>`).join("")
         : `<tr><td colspan="4" style="text-align:center;color:#94a3b8">Belum ada riwayat</td></tr>`;

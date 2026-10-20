@@ -66,9 +66,9 @@
       $("#sapaan").textContent = `${sapa}, ${guru.nama.split(",")[0]}!`;
       $("#sub-sapaan").textContent = `${guru.mapel} • ${new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`;
 
-      // Status absen hari ini (dicek dari penyimpanan presensi demo)
+      // Status absen hari ini (dicek dari penyimpanan presensi demo + tanggal hari ini)
       const presensi = JSON.parse(localStorage.getItem("sp_presensi") || "null");
-      const sudahAbsen = presensi && presensi.status;
+      const sudahAbsen = presensi && presensi.status && presensi.tgl === tglISO();
       $("#status-absen").innerHTML = sudahAbsen
         ? `<div class="status-absen-box sudah">
              <div class="ic"><i class="fa-solid fa-check"></i></div>
@@ -84,7 +84,7 @@
 
       // Jadwal hari ini
       $("#hari-ini").textContent = hariIni();
-      const jadwalHari = JADWAL_GURU
+      const jadwalHari = dataJadwal()
         .filter(j => j.idGuru === guru.id && j.hari === hariIni())
         .sort((a, b) => a.jamKe - b.jamKe);
 
